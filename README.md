@@ -104,27 +104,7 @@ Possible nodes include:
 
 ---
 
-# 📸 Screenshots
 
-> *(Add screenshots here)*
-
-### 📖 Teacher Center
-
-![Teacher](screenshots/teacher.png)
-
-### 📝 Quiz Generation
-
-![Quiz](screenshots/quiz.png)
-
-### ✅ Quiz Evaluation
-
-![Evaluation](screenshots/evaluation.png)
-
-### 📄 Learning from Uploaded Notes
-
-![RAG](screenshots/rag.png)
-
----
 
 # 📂 Project Structure
 
@@ -132,10 +112,10 @@ Possible nodes include:
 Study-AI-Agent
 │
 ├── app.py
-├── Final_Agent_Deterministic.py
-├── ingest.py
-├── database.py
-├── StudySpace_FINAL.html
+├── Agent.py
+├── Ingest.py
+├── Database.py
+├── StudySpace.html
 ├── uploads/
 ├── chromadb/
 ├── requirements.txt
@@ -183,21 +163,12 @@ StudySpace_FINAL.html
 
 - 📚 Flashcard Generation
 - 🧠 Long-term Memory
-- 🎙️ Voice Interaction
-- 📈 Learning Analytics Dashboard
 - 📅 Study Planner
 - 🎥 YouTube Lecture Retrieval
 - 📖 Multi-document Reasoning
 
 ---
 
-# 🤝 Contributions
-
-Contributions, ideas, and suggestions are always welcome!
-
-Feel free to open an issue or submit a pull request.
-
----
 
 # ⭐ If you like this project...
 
