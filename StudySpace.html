@@ -79,7 +79,6 @@ async function uploadFiles(){
 
     formData.append("file", selectedFiles[0]);
 
-    // Change "/upload" if your FastAPI endpoint has a different route.
     const response=await fetch("http://127.0.0.1:8000/upload",{
         method:"POST",
         body:formData
