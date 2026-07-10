@@ -1,0 +1,298 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Study Assistant</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#0f172a;color:#fff;padding:24px}
+.container{display:grid;grid-template-rows:auto 1fr auto;gap:20px;height:95vh}
+.top{display:flex;gap:12px}
+#query{flex:1;padding:16px;border:none;border-radius:12px;background:#1e293b;color:#fff}
+button{padding:12px 18px;border:none;border-radius:10px;background:#3b82f6;color:#fff;cursor:pointer;font-weight:bold}
+button:hover{background:#2563eb}
+.main{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.panel,.upload{background:#1e293b;padding:20px;border-radius:16px;overflow:auto}
+.upload-row{display:flex;align-items:center;gap:10px;margin-bottom:15px}
+.file-list{display:flex;gap:10px;overflow-x:auto}
+.file-card{background:#334155;padding:10px;border-radius:8px;min-width:160px;text-align:center}
+.question{background:#334155;padding:12px;border-radius:10px;margin:12px 0}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<div class="top">
+<input id="query" placeholder="Ask anything...">
+<button onclick="sendQuery()">Send</button>
+</div>
+
+<div class="main">
+<div class="panel">
+<h2>📘 Teacher Center</h2>
+<div id="teacherContent">Teacher responses appear here.</div>
+</div>
+
+<div class="panel">
+<h2>📝 Quiz Center</h2>
+<div id="quizContent">No quiz generated yet.</div>
+</div>
+</div>
+
+<div class="upload">
+<h2>📂 Uploaded Files</h2><br>
+
+<div class="upload-row">
+
+<input id="fileInput" type="file" multiple>
+
+<button onclick="uploadFiles()">Upload</button>
+
+</div>
+
+<div id="fileList" class="file-list"></div>
+
+</div>
+
+</div>
+
+<script>
+const selectedFiles=[];
+let agentstate = null;
+let currentQuestionIndex = 0;
+document.getElementById("fileInput").addEventListener("change",e=>{
+    selectedFiles.length=0;
+    [...e.target.files].forEach(f=>selectedFiles.push(f));
+});
+
+async function uploadFiles(){
+
+    if(selectedFiles.length===0){
+        alert("Please choose files first.");
+        return;
+    }
+
+    const formData=new FormData();
+
+    formData.append("file", selectedFiles[0]);
+
+    // Change "/upload" if your FastAPI endpoint has a different route.
+    const response=await fetch("http://127.0.0.1:8000/upload",{
+        method:"POST",
+        body:formData
+    });
+
+    if(!response.ok){
+        alert("Upload failed.");
+        return;
+    }
+
+    const list=document.getElementById("fileList");
+
+    selectedFiles.forEach(file=>{
+        const card=document.createElement("div");
+        card.className="file-card";
+        card.textContent="📄 "+file.name;
+        list.appendChild(card);
+    });
+
+    alert("Files uploaded successfully!");
+}
+
+async function sendQuery(){
+    const query=document.getElementById("query").value.trim();
+    if(!query) return;
+
+    const response=await fetch("http://127.0.0.1:8000/chat",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({query})
+    });
+
+    const data=await response.json();
+    agentstate = data.state
+
+    if(agentstate.lesson){
+        document.getElementById("teacherContent").innerHTML =
+    marked.parse(agentstate.lesson);
+    }
+    if(agentstate.quiz){
+        currentQuestionIndex = 0;
+        renderQuiz(agentstate.quiz);
+    }
+}
+
+
+function renderQuiz(quiz){
+
+    const container = document.getElementById("quizContent");
+    const q = quiz.questions[currentQuestionIndex];
+
+    let html = `
+        <h3>${quiz.topic}</h3>
+
+        <div class="question">
+            <div style="margin-bottom:15px;font-weight:bold;">
+                Question ${currentQuestionIndex+1}/${quiz.questions.length}
+            </div>
+
+            <div style="margin-bottom:20px;">
+                ${q.question}
+            </div>
+    `;
+
+    if(q.type==="mcq"){
+
+        q.options.forEach(opt=>{
+            html += `
+                <button style="display:block;width:100%;margin-bottom:10px;"
+                        onclick="selectOption(this,'${opt}')">
+                    ${opt}
+                </button>
+            `;
+        });
+
+        html += `<input type="hidden" id="selectedAnswer">`;
+
+    }
+    else if(q.type==="true_false"){
+
+        html += `
+            <button style="width:48%;" onclick="selectOption(this,'True')">True</button>
+            <button style="width:48%;float:right;" onclick="selectOption(this,'False')">False</button>
+            <input type="hidden" id="selectedAnswer">
+            <div style="clear:both;"></div>
+        `;
+    }
+    else{
+
+        html += `
+            <textarea
+                id="shortAnswer"
+                rows="5"
+                style="width:100%;resize:vertical;overflow-y:auto;"
+                placeholder="Type your answer here...">
+            </textarea>
+        `;
+    }
+
+    html += `
+        <div id="evaluationArea" style="margin-top:20px;"></div>
+
+        <div style="display:flex;justify-content:space-between;margin-top:20px;">
+            <button onclick="submitAnswer()">Submit</button>
+
+            <button onclick="nextQuestion()"
+                ${currentQuestionIndex===quiz.questions.length-1 ? "disabled" : ""}>
+                Next
+            </button>
+        </div>
+
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function selectOption(btn,value){
+
+    document.querySelectorAll("#quizContent button").forEach(b=>{
+        b.style.background="#3b82f6";
+    });
+
+    btn.style.background="#16a34a";
+    document.getElementById("selectedAnswer").value=value;
+}
+
+async function submitAnswer(){
+
+    const q = agentstate.quiz.questions[currentQuestionIndex];
+
+    let answer="";
+
+    if(q.type==="short_answer"){
+        answer=document.getElementById("shortAnswer").value;
+    }else{
+        answer=document.getElementById("selectedAnswer").value;
+    }
+
+    if(answer.trim()===""){
+        alert("Please enter or select an answer.");
+        return;
+    }
+
+    const response = await fetch("http://127.0.0.1:8000/evaluate",{
+
+        method:"POST",
+
+        headers:{
+            "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify({
+
+            question_id:q.id,
+
+            user_answer:answer
+
+        })
+
+    });
+    if(!response.ok){
+
+    const err = await response.json();
+
+    alert(err.detail);
+
+    return;
+}
+    const data = await response.json();
+
+    const evaluation = document.getElementById("evaluationArea");
+
+    if(q.type==="short_answer"){
+
+        evaluation.innerHTML = `
+        <div class="evaluation-card">
+            <h4>Evaluation</h4>
+            <h3>${data.quiz_evaluation.rating}/5 ⭐</h3>
+            <p>${data.quiz_evaluation.explanation}</p>
+        </div>
+        `;
+
+    }else{
+
+        const colour =
+            data.quiz_evaluation.eval==="Correct"
+            ? "green"
+            : "red";
+
+        evaluation.innerHTML = `
+        <div class="evaluation-card">
+            <h4 style="color:${colour};">
+                ${data.quiz_evaluation.eval}
+            </h4>
+            <p>${data.quiz_evaluation.explanation}</p>
+        </div>
+        `;
+
+    }
+
+    document.querySelector('button[onclick="submitAnswer()"]').disabled = true;
+}
+
+function nextQuestion(){
+
+    if(currentQuestionIndex < agentstate.quiz.questions.length-1){
+        currentQuestionIndex++;
+        renderQuiz(agentstate.quiz);
+    }
+}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+</body>
+</html>
