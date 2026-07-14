@@ -175,6 +175,8 @@ Neon stays the database in every case (free, non-expiring, pgvector).
 - [ ] Secrets set as HF Space secrets, not committed.
 - [ ] Log level + structured logs.
 - [ ] Handle cold-start/wake gracefully (first request after idle is slow — expected).
+- [ ] First boot downloads the fastembed ONNX model (~83 MB) into the model cache;
+      pre-warm in the Docker build or accept a one-time delay on first embed.
 - [ ] Rate limiting / auth (post-v1, tracked in requirements §5).
 
 ---

@@ -24,8 +24,8 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 | A9 | 🟡 | CORS `allow_origins=["*"]` with credentials — tighten before deploy. | `app.py:29` | Phase 7 |
 | A10 | 🔵 | No `/health`, no structured error envelope, no streaming. | `app.py` | Phase 6 |
 | A11 | 🔵 | No tests. | repo | ongoing |
-| A12 | 🟠 | `requirements.txt` (frozen) is **missing packages the code imports**: `langchain-groq`, `langchain-tavily`, `sentence-transformers`, `pypdf`. Implies the original code was never fully run in that env. **Partly fixed (Phase 1):** added them (unpinned) at the bottom of `requirements.txt`; must `pip install -r requirements.txt` and re-freeze to pin. | `requirements.txt` | Phase 1 (verify on install) |
-| A13 | 🔵 | Local HF embeddings pull `sentence-transformers` + `torch` (large download). Fine for free tier but slows first boot; note for HF Spaces build. | `app/persistence/vectorstore.py` | Phase 7/9 |
+| A12 | ✅ 🟠 | ~~`requirements.txt` missing imported packages / conflicting pins.~~ **RESOLVED:** replaced the broken freeze with a curated `requirements.txt`; venv built cleanly on Python 3.13; exact versions captured in `requirements.lock.txt`. | `requirements.txt`, `requirements.lock.txt` | ✅ |
+| A13 | ✅ 🔵 | ~~Local HF embeddings pull `sentence-transformers` + `torch` (~2.5 GB).~~ **RESOLVED:** switched embedding runtime to **fastembed (ONNX)** — same model, ~15 MB + one-time ~83 MB model download, no torch. Much lighter for free HF Spaces. | `app/persistence/vectorstore.py` | ✅ |
 | A14 | 🔵 | Any vectors ingested BEFORE Phase 2 lack `session_id` metadata, so they won't match the session filter. Not a code bug — just re-upload docs after Phase 2 (or wipe `Chromadb/`). | `Chromadb/` | note only |
 
 ---

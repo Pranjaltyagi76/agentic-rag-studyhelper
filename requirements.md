@@ -79,9 +79,11 @@ observable, multi-user API.
 
 ## 4. Constraints & assumptions
 
-- **Models**: Groq `llama-3.3-70b-versatile` (reasoning), HF `all-MiniLM-L6-v2`
-  (embeddings — canonical, both ingest + query), Gemini for PDF OCR, Tavily for web search.
-  *(Note: `app.py:22` references a HF model that must be validated/removed before use.)*
+- **Models**: Groq `llama-3.3-70b-versatile` (reasoning), `all-MiniLM-L6-v2`
+  (embeddings — canonical, both ingest + query; runs on **fastembed/ONNX**, torch-free),
+  Gemini for PDF OCR, Tavily for web search.
+- **Runtime**: Python 3.13 venv (`.venv`); deps in curated `requirements.txt` (exact
+  pins in `requirements.lock.txt`).
 - **Observability**: LangSmith. **Evaluation**: MLflow.
 - **Vector store**: `pgvector` (canonical, on Neon) for deploy; Chroma for local dev only.
 - **Auth**: out of scope for v1 (session_id is client-supplied); add later.
