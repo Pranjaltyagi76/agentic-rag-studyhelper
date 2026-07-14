@@ -45,5 +45,11 @@ class Settings:
     # general knowledge. Guarantees termination (design.md section 3).
     RETRIEVAL_MAX_ATTEMPTS: int = int(os.getenv("RETRIEVAL_MAX_ATTEMPTS", "2"))
 
+    # --- Generate + verify loop / adaptive planner (Phase 4) ---
+    # Max teacher (generate -> groundedness check -> regenerate) attempts.
+    GENERATION_MAX_ATTEMPTS: int = int(os.getenv("GENERATION_MAX_ATTEMPTS", "2"))
+    # Max adaptive re-plans on failure before the planner stops intervening.
+    REPLAN_MAX: int = int(os.getenv("REPLAN_MAX", "3"))
+
 
 settings = Settings()

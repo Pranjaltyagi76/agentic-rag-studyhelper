@@ -19,8 +19,8 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 | A4 | 🟠 | `messages` is always passed empty → no memory despite `add_messages` reducer. | `app/api/chat.py` | Phase 5 |
 | A5 | ✅ 🟡 | ~~Unused HF `DeepSeek-V4-Flash` model.~~ **RESOLVED (Phase 1):** dropped during the refactor; not carried into `app/`. | (was `app.py:19-25`) | Phase 1 ✅ |
 | A6 | ✅ 🟡 | ~~No relevance grading — chunks used as-is.~~ **RESOLVED (Phase 3):** shared retrieval subgraph grades chunks (drops irrelevant) + rewrites/retries on weak retrieval, capped by `RETRIEVAL_MAX_ATTEMPTS`. | `app/agent/retrieval.py` | Phase 3 ✅ |
-| A7 | 🟡 | No groundedness/hallucination check on generated lessons. | `teacher_node` | Phase 4 |
-| A8 | 🟡 | "Adaptive" planner is actually static replay of a fixed task list. | `executor` `Agent.py:874` | Phase 4 |
+| A7 | ✅ 🟡 | ~~No groundedness/hallucination check.~~ **RESOLVED (Phase 4):** teacher verifies the lesson against its sources and regenerates (cap `GENERATION_MAX_ATTEMPTS`), flagging unsupported claims if still ungrounded. | `app/agent/teacher.py` | Phase 4 ✅ |
+| A8 | ✅ 🟡 | ~~"Adaptive" planner is static replay.~~ **RESOLVED (Phase 4):** planner adapts on a failure signal (ungrounded lesson) — inserts a corrective task or finishes early, capped by `REPLAN_MAX`; `executor` honors an early-finish flag. | `app/agent/planner.py`, `app/agent/graph.py` | Phase 4 ✅ |
 | A9 | 🟡 | CORS `allow_origins=["*"]` with credentials — tighten before deploy. | `app.py:29` | Phase 7 |
 | A10 | 🔵 | No `/health`, no structured error envelope, no streaming. | `app.py` | Phase 6 |
 | A11 | 🔵 | No tests. | repo | ongoing |
@@ -67,7 +67,7 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 | Two sessions isolated (no cross-read) | 2 | 🧪 ready to test (code complete) |
 | Restart resumes in-flight session | 5 | ⬜ |
 | Irrelevant chunks dropped + re-retrieval fires | 3 | ✅ drop verified live; retry wired+capped |
-| Ungrounded generation → regenerate/flag | 4 | ⬜ |
+| Ungrounded generation → regenerate/flag | 4 | ✅ check runs live (grounded=True→clean); regen/flag wired+capped |
 | `docker-compose up` full stack works | 7 | ⬜ |
 | Every request traced | 8 | ⬜ |
 | Deployed URL == local flow | 9 | ⬜ |

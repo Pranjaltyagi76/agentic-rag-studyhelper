@@ -62,3 +62,8 @@ class AgentState(TypedDict):
     quiz_evaluation: QuizEval | None
     current_task_index: int | None
     messages: Annotated[list[BaseMessage], add_messages]
+
+    # Phase 4 — generate/verify loop + adaptive planner
+    grounded: bool | None          # teacher: was the lesson grounded in its sources?
+    replans: int | None            # adaptive planner: number of failure-driven re-plans
+    finished: bool | None          # adaptive planner: end early (goal met)

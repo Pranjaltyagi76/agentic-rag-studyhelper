@@ -47,10 +47,14 @@
   keeping relevant ones (photosynthesis); retry loop wired + capped. Traces will show
   in LangSmith once Phase 8 enables it.
 
-## Phase 4 — Generate+verify loop + adaptive planner (FR-2.5, FR-5.3)
-- [ ] Teacher groundedness check + regenerate cap M.
-- [ ] Planner re-invoked with results; can add/skip/reorder; replan cap.
-- **DoD:** ungrounded output triggers regenerate/flag; planner adapts on failure.
+## Phase 4 — Generate+verify loop + adaptive planner (FR-2.5, FR-5.3) ✅
+- [x] Teacher `generate → check_groundedness → regenerate` loop, cap `GENERATION_MAX_ATTEMPTS`;
+      flags unsupported claims if still ungrounded; skips check when there are no sources.
+- [x] Planner re-invoked after each task; on a failure signal (ungrounded lesson) it asks
+      an LLM whether to insert a corrective task or finish early; cap `REPLAN_MAX`.
+- **DoD:** ✅ verified live — groundedness check runs (grounded=True on grounded input,
+  lesson clean; regenerate/flag path wired + capped); planner stays cheap on success
+  and adapts only on failure (replans=0 when grounded).
 
 ## Phase 5 — Persistence & memory (FR-6.2, FR-6.4, NFR-2)
 - [ ] `PostgresSaver` checkpointer wraps the graph, keyed by `session_id`.
@@ -92,7 +96,7 @@
 
 ## Milestones
 - **M1 — Solid foundation:** Phases 1–2 (structure + isolation).
-- **M2 — Advanced RAG:** Phases 3–4 (the self-correcting loops = "advanced").
+- **M2 — Advanced RAG:** Phases 3–4 (the self-correcting loops = "advanced"). ✅ **DONE**
 - **M3 — Durable & observable:** Phases 5–6, 8 (+ 8.5 evaluation).
 - **M4 — Shipped:** Phases 7, 9.
 

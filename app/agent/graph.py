@@ -14,6 +14,10 @@ from app.agent.quiz import quiz_generator_node, QuizEvaluationNode
 
 
 def executor(state: AgentState):
+    # Phase 4: adaptive planner can end early once the goal is met.
+    if state.get("finished"):
+        return END
+
     if state["current_task_index"] >= len(state["plan"].tasks):
         return END
 
