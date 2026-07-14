@@ -1,0 +1,94 @@
+# Roadmap — Advanced Agentic RAG Study Helper
+
+> Execution plan. Each phase is independently shippable & testable. Check items off
+> as we go. Ties to [requirements.md](requirements.md) FR/NFR ids and
+> [design.md](design.md) sections.
+
+---
+
+## Legend
+`[ ]` todo · `[~]` in progress · `[x]` done · **DoD** = definition of done
+
+---
+
+## Phase 0 — Planning docs ✅
+- [x] ARCHITECTURE.md
+- [x] requirements.md, design.md, roadmap.md, deployment.md, review.md, strategy.md
+- **DoD:** shared understanding of what/how/when before code changes.
+
+## Phase 1 — Behavior-preserving refactor ✅ (code complete; runtime boot pending deps+keys)
+- [x] Split `Agent.py` / `app.py` into the `app/` package (ARCHITECTURE §5).
+- [x] No logic change; endpoints unchanged (`/upload`, `/chat`, `/evaluate` + new `/health`).
+- [x] Resolve embedding issue (A2: removed dead Google embeddings; HF canonical) and dead HF model (A5: dropped).
+- [x] Added missing runtime deps to `requirements.txt` (A12).
+- **DoD:** same behavior, new structure. ⚠️ **Boot not yet verified** — this env lacks
+  installed deps + API keys. Verify with: `pip install -r requirements.txt` then
+  `uvicorn app.main:app --port 8000` and exercise the flow. Byte-compile + import
+  graph checks passed.
+
+## Phase 2 — Sessions & multi-user isolation (FR-6, NFR-1)
+- [ ] Remove global `current_agent_state` / `uploaded_files` (`app.py:36`).
+- [ ] Add `session_id` to all endpoints + state.
+- [ ] Postgres `sessions`, `messages`, `documents` tables.
+- [ ] Vector filter includes `session_id` (fix `RAG_Tool`, `Agent.py:226`).
+- **DoD:** two concurrent sessions are fully isolated (acceptance test).
+
+## Phase 3 — Self-corrective retrieval subgraph (FR-2.2, FR-2.3)
+- [ ] `plan_retrieval` → `retrieve` → `grade_docs` → `decide_next` → `web_fallback`.
+- [ ] Retry cap N; query rewrite on weak retrieval.
+- [ ] Shared by teacher & quiz_generator.
+- **DoD:** irrelevant chunks are dropped and re-retrieval fires (traced).
+
+## Phase 4 — Generate+verify loop + adaptive planner (FR-2.5, FR-5.3)
+- [ ] Teacher groundedness check + regenerate cap M.
+- [ ] Planner re-invoked with results; can add/skip/reorder; replan cap.
+- **DoD:** ungrounded output triggers regenerate/flag; planner adapts on failure.
+
+## Phase 5 — Persistence & memory (FR-6.2, FR-6.4, NFR-2)
+- [ ] `PostgresSaver` checkpointer wraps the graph, keyed by `session_id`.
+- [ ] Real conversational `messages` memory across requests.
+- **DoD:** restart mid-session; memory + in-flight state resume.
+
+## Phase 6 — Streaming API (FR-7.2)
+- [ ] SSE node-by-node progress for `/chat`.
+- [ ] Consistent error envelope + `/health`.
+- **DoD:** client sees incremental progress; errors are structured.
+
+## Phase 7 — Docker (NFR-4, NFR-5)
+- [ ] Multi-stage `Dockerfile` (port 7860 for HF Spaces).
+- [ ] `docker-compose` for LOCAL DEV using `pgvector/pgvector:pg16` (mirrors Neon).
+- [ ] Env-driven config; `.env.example`.
+- **DoD:** `docker-compose up` → working stack locally on the same vector backend as prod.
+
+## Phase 8 — Observability (NFR-3)
+- [ ] **LangSmith** tracing on every node + LLM call (env: `LANGCHAIN_TRACING_V2`).
+- [ ] Retrieval-quality metrics (grade pass rate, retries, groundedness rate).
+- [ ] OpenTelemetry on FastAPI layer.
+- **DoD:** every request is traceable end-to-end in LangSmith.
+
+## Phase 8.5 — Evaluation (NFR-9, post-M2)
+- [ ] Curate a small RAG eval set (questions + expected/reference answers per doc).
+- [ ] **MLflow** eval: retrieval relevance, groundedness/faithfulness, answer quality.
+- [ ] Log runs to MLflow so prompt/retrieval changes are compared over time.
+- **DoD:** a config/prompt change shows a measurable delta in MLflow.
+- *Note:* needs the self-correcting loops (M2) to exist before it's meaningful.
+
+## Phase 9 — Deployment (free tier: HF Spaces + Neon)
+- [ ] Provision **Neon** free Postgres; `CREATE EXTENSION vector;`.
+- [ ] Deploy app to **Hugging Face Spaces** (Docker SDK) from our Dockerfile.
+- [ ] Secrets set as HF Space secrets; healthcheck; migrations on boot.
+- [ ] `VECTOR_BACKEND=pgvector` in prod (Chroma stays local-dev only).
+- **DoD:** public HF Space URL runs the same flow as local; traces flow in prod; $0 spent.
+
+---
+
+## Milestones
+- **M1 — Solid foundation:** Phases 1–2 (structure + isolation).
+- **M2 — Advanced RAG:** Phases 3–4 (the self-correcting loops = "advanced").
+- **M3 — Durable & observable:** Phases 5–6, 8 (+ 8.5 evaluation).
+- **M4 — Shipped:** Phases 7, 9.
+
+## Risks (see review.md for the live log)
+- Embedding mismatch corrupts retrieval → address in Phase 1.
+- LLM structured-output flakiness on planners → validation + retries.
+- Cost/latency from nested loops → the N/M/replan caps in design.md §3–5.

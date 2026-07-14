@@ -161,3 +161,11 @@ xxhash==3.8.0
 yarl==1.24.2
 youtube-transcript-api==1.2.4
 zstandard==0.25.0
+
+# --- Added in Phase 1: imported by the code but missing from the original freeze ---
+# (unpinned so pip resolves compatible versions against langchain-core 1.4.8;
+#  pin these once installed via `pip freeze`.)
+langchain-groq
+langchain-tavily
+sentence-transformers
+pypdf

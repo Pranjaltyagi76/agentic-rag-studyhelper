@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+
+# App data (local runtime artifacts)
+uploads/
+Chromadb/
+mlruns/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
