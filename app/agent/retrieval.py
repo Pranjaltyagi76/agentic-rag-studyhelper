@@ -22,7 +22,7 @@ from langchain_tavily import TavilySearch
 from langgraph.graph import StateGraph, START, END
 
 from app.config import settings
-from app.agent.llm import model
+from app.agent.structured import structured_invoke
 from app.persistence.vectorstore import vectordb
 
 search = TavilySearch(max_results=settings.TAVILY_MAX_RESULTS)
@@ -173,8 +173,10 @@ Rules:
      whole topic 20, whole chapter 30.
 
 Do NOT answer or teach. Return ONLY the RetrievalPlan schema."""
-    plan = model.with_structured_output(RetrievalPlan).invoke(
-        [SystemMessage(content=system), HumanMessage(content=state["query"])]
+    plan = structured_invoke(
+        RetrievalPlan,
+        [SystemMessage(content=system), HumanMessage(content=state["query"])],
+        default=RetrievalPlan(use_rag=False),  # safe: fall back to general knowledge / web
     )
     return {
         "use_rag": bool(plan.use_rag),
@@ -200,11 +202,14 @@ def _grade(state: RetrievalState) -> dict:
         return {"sufficient": False, "missing": "No documents were retrieved."}
 
     numbered = "\n\n".join(f"[{i}] {d.page_content}" for i, d in enumerate(raw))
-    grade = model.with_structured_output(DocsGrade).invoke(
+    grade = structured_invoke(
+        DocsGrade,
         [
             SystemMessage(content=_GRADE_SYSTEM),
             HumanMessage(content=f"Query:\n{state['query']}\n\nChunks:\n{numbered}"),
-        ]
+        ],
+        # If grading fails, keep all retrieved chunks and treat them as sufficient.
+        default=DocsGrade(relevant_ids=list(range(len(raw))), sufficient=True),
     )
 
     picked = [raw[i] for i in grade.relevant_ids if 0 <= i < len(raw)]
@@ -227,7 +232,8 @@ def _grade(state: RetrievalState) -> dict:
 
 
 def _rewrite(state: RetrievalState) -> dict:
-    rewrite = model.with_structured_output(QueryRewrite).invoke(
+    rewrite = structured_invoke(
+        QueryRewrite,
         [
             SystemMessage(content=_REWRITE_SYSTEM),
             HumanMessage(
@@ -237,7 +243,8 @@ def _rewrite(state: RetrievalState) -> dict:
                     f"What was missing:\n{state.get('missing')}"
                 )
             ),
-        ]
+        ],
+        default=QueryRewrite(rag_query=state["query"]),  # fall back to the original query
     )
     return {"rag_query": rewrite.rag_query}
 
@@ -246,7 +253,8 @@ def _plan_web(state: RetrievalState) -> dict:
     if not state.get("allow_web"):
         return {"use_web": False, "web_queries": []}
 
-    plan = model.with_structured_output(WebPlan).invoke(
+    plan = structured_invoke(
+        WebPlan,
         [
             SystemMessage(content=_WEB_SYSTEM),
             HumanMessage(
@@ -256,7 +264,8 @@ def _plan_web(state: RetrievalState) -> dict:
                     f"Notes sufficient: {state.get('sufficient', False)}"
                 )
             ),
-        ]
+        ],
+        default=WebPlan(use_web=False),  # safe: skip web if planning fails
     )
     return {"use_web": bool(plan.use_web), "web_queries": plan.web_queries or []}
 

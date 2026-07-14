@@ -56,5 +56,9 @@ class Settings:
     # Max adaptive re-plans on failure before the planner stops intervening.
     REPLAN_MAX: int = int(os.getenv("REPLAN_MAX", "3"))
 
+    # --- Structured-output robustness (A16) ---
+    # Retries for structured LLM calls before salvaging / defaulting.
+    STRUCTURED_MAX_RETRIES: int = int(os.getenv("STRUCTURED_MAX_RETRIES", "2"))
+
 
 settings = Settings()

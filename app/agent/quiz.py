@@ -6,7 +6,7 @@ subgraph with the teacher node.
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from app.agent.llm import model
+from app.agent.structured import structured_invoke
 from app.agent.retrieval import run_retrieval
 from app.agent.state import AgentState, Quiz, QuizEval
 
@@ -91,9 +91,6 @@ well-designed assessment.
 """
 
 
-QuizGenerator = model.with_structured_output(Quiz)
-
-
 def quiz_generator_node(state: AgentState):
     """Generate a quiz from the user's notes (self-correcting retrieval) or general knowledge.
 
@@ -110,7 +107,7 @@ def quiz_generator_node(state: AgentState):
         allow_web=False,
     )
 
-    quiz = QuizGenerator.invoke([
+    quiz = structured_invoke(Quiz, [
         SystemMessage(content=quiz_system),
         HumanMessage(content=f"""
 User Query:
@@ -250,9 +247,6 @@ Return ONLY the QuizEval schema.
 """
 
 
-QuizEvaluator = model.with_structured_output(QuizEval)
-
-
 def QuizEvaluationNode(state: AgentState):
     """
     Evaluates the user's answer for the current quiz question.
@@ -261,7 +255,7 @@ def QuizEvaluationNode(state: AgentState):
     current_question = state["quiz"].questions[
         state["current_question_id"] - 1
     ]
-    response = QuizEvaluator.invoke([
+    response = structured_invoke(QuizEval, [
         SystemMessage(content=quiz_evaluator_system),
 
         HumanMessage(

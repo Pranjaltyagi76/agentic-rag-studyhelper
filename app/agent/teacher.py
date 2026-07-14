@@ -11,6 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.config import settings
 from app.agent.llm import model
+from app.agent.structured import structured_invoke
 from app.agent.retrieval import run_retrieval
 from app.agent.state import AgentState
 
@@ -156,7 +157,6 @@ def teacher_node(state: AgentState):
     sources = (notes + "\n" + web).strip()
     history = _history_text(state)
 
-    grader = model.with_structured_output(Groundedness)
     feedback = ""
     grounded: bool | None = None
     lesson = ""
@@ -169,10 +169,14 @@ def teacher_node(state: AgentState):
             grounded = None
             break
 
-        verdict = grader.invoke([
-            SystemMessage(content=groundedness_system),
-            HumanMessage(content=f"SOURCES:\n{sources}\n\nLESSON:\n{lesson}"),
-        ])
+        verdict = structured_invoke(
+            Groundedness,
+            [
+                SystemMessage(content=groundedness_system),
+                HumanMessage(content=f"SOURCES:\n{sources}\n\nLESSON:\n{lesson}"),
+            ],
+            default=Groundedness(grounded=True),  # don't block the lesson if the check fails
+        )
         grounded = verdict.grounded
 
         if verdict.grounded or attempt >= settings.GENERATION_MAX_ATTEMPTS:

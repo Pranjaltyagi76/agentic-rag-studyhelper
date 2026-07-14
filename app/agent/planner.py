@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.config import settings
-from app.agent.llm import model
+from app.agent.structured import structured_invoke
 from app.agent.state import AgentState, PlannerState, task
 
 
@@ -179,12 +179,16 @@ tool = quiz_eval
 8. Return ONLY the PlannerState schema.
 """
     query = state['query']
-    planner = model.with_structured_output(schema=PlannerState)
-    plan = planner.invoke([
-        SystemMessage(content=Planner_system),
-        HumanMessage(content=f""" Query: {query}
+    plan = structured_invoke(
+        PlannerState,
+        [
+            SystemMessage(content=Planner_system),
+            HumanMessage(content=f""" Query: {query}
                                         """),
-    ])
+        ],
+        # If planning fails entirely, fall back to a single teaching task.
+        default=PlannerState(tasks=[task(task_id=1, tool="teacher", task=query, topic=query)]),
+    )
     return {"plan": plan, "replans": 0}
 
 
@@ -221,15 +225,19 @@ def PlannerNode(state: AgentState):
         return {}  # nothing to adapt; executor advances or ends
 
     plan = state["plan"]
-    decision = model.with_structured_output(AdaptiveDecision).invoke([
-        SystemMessage(content=adaptive_system),
-        HumanMessage(content=(
-            f"Original request:\n{state['query']}\n\n"
-            f"Planned tools: {[t.tool for t in plan.tasks]}\n"
-            f"Progress: {_results_summary(state)}\n"
-            f"Failure signal: the most recent lesson was not fully grounded in its sources."
-        )),
-    ])
+    decision = structured_invoke(
+        AdaptiveDecision,
+        [
+            SystemMessage(content=adaptive_system),
+            HumanMessage(content=(
+                f"Original request:\n{state['query']}\n\n"
+                f"Planned tools: {[t.tool for t in plan.tasks]}\n"
+                f"Progress: {_results_summary(state)}\n"
+                f"Failure signal: the most recent lesson was not fully grounded in its sources."
+            )),
+        ],
+        default=AdaptiveDecision(action="continue", reason="fallback: structured call failed"),
+    )
 
     updates: dict = {"replans": replans + 1}
     if decision.action == "finish":
