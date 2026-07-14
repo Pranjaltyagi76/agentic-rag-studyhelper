@@ -13,6 +13,8 @@ env/
 uploads/
 Chromadb/
 mlruns/
+*.db
+studyhelper.db
 
 # OS / editor
 .DS_Store

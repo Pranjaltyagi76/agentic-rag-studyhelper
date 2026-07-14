@@ -206,6 +206,7 @@ Your ONLY job is to fill the TeacherPlan schema.
             query=rag_plan.rag_query,
             filename=rag_plan.filename,
             k=rag_plan.number_chunks,
+            session_id=state["session_id"],
         )
     research_plan = TeachingPlanner.invoke([
         SystemMessage(content=web_research_system),

@@ -159,8 +159,13 @@ json: { session_id, question_id, user_answer }
 
 - **Checkpointer**: `PostgresSaver(thread_id=session_id)` wraps the compiled graph.
   Enables FR-6.2 (memory) and FR-6.4 (resumability).
-- **Tables**: `sessions`, `messages`, `documents` (see ARCHITECTURE §3).
-- **Vector metadata** must include `session_id`; all retrieval filters on it.
+- **Tables**: `sessions`, `documents` in Phase 2; `messages` + checkpoint tables in Phase 5.
+- **DB backend**: SQLAlchemy on `DATABASE_URL` — SQLite for local dev/test (zero setup),
+  Neon Postgres in prod. Config-only swap, mirroring Chroma/pgvector.
+- **Vector metadata** includes `session_id` (Phase 2); all retrieval filters on it.
+- **Transient state**: the quiz carried from `/chat` to `/evaluate` is kept in an
+  in-memory per-session store (Phase 2) — isolated but not durable; Phase 5's
+  checkpointer makes it durable/resumable.
 
 ---
 

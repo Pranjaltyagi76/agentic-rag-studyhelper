@@ -52,7 +52,7 @@ def load_pdf(file_path: str):
         return text
 
 
-def create_chunks(text, filename):
+def create_chunks(text, filename, session_id):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
@@ -62,13 +62,15 @@ def create_chunks(text, filename):
         metadatas=[
             {
                 "file_name": filename,
+                # Phase 2: tag every vector with its owning session for isolation.
+                "session_id": session_id,
             }
         ],
     )
     return chunks
 
 
-def ingest(file_path, filename):
+def ingest(file_path, filename, session_id):
     text = load_pdf(file_path)
-    chunks = create_chunks(text, filename)
+    chunks = create_chunks(text, filename, session_id)
     return chunks

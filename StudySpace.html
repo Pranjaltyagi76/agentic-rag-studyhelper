@@ -63,6 +63,19 @@ button:hover{background:#2563eb}
 const selectedFiles=[];
 let agentstate = null;
 let currentQuestionIndex = 0;
+
+// Stable per-browser session id so this client's uploads/quizzes stay isolated
+// from other users (Phase 2). Persisted so a page reload keeps the same session.
+function getSessionId(){
+    let sid = localStorage.getItem("session_id");
+    if(!sid){
+        sid = (window.crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : "sess-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+        localStorage.setItem("session_id", sid);
+    }
+    return sid;
+}
 document.getElementById("fileInput").addEventListener("change",e=>{
     selectedFiles.length=0;
     [...e.target.files].forEach(f=>selectedFiles.push(f));
@@ -78,6 +91,7 @@ async function uploadFiles(){
     const formData=new FormData();
 
     formData.append("file", selectedFiles[0]);
+    formData.append("session_id", getSessionId());
 
     const response=await fetch("http://127.0.0.1:8000/upload",{
         method:"POST",
@@ -108,7 +122,7 @@ async function sendQuery(){
     const response=await fetch("http://127.0.0.1:8000/chat",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({query})
+        body:JSON.stringify({session_id:getSessionId(), query})
     });
 
     const data=await response.json();
@@ -232,6 +246,8 @@ async function submitAnswer(){
         },
 
         body:JSON.stringify({
+
+            session_id:getSessionId(),
 
             question_id:q.id,
 

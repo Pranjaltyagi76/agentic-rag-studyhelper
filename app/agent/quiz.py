@@ -229,6 +229,7 @@ Do NOT include instructions such as:
             query=quiz_plan.rag_query,
             filename=quiz_plan.filename,
             k=quiz_plan.number_chunks,
+            session_id=state["session_id"],
         )
 
     docs_text = "\n\n".join(

@@ -87,3 +87,4 @@ planning, not by adding models.
 | 2026-07-14 | Observability = **LangSmith**; Evaluation = **MLflow**. | LangSmith for live per-node/LLM tracing (native to LangGraph); MLflow for offline RAG-quality eval + experiment tracking. No tool overlap. |
 | 2026-07-14 | **Free-first is a hard constraint** (user has no budget). | All infra must run on free tiers; accept free-tier trade-offs over paying. |
 | 2026-07-14 | Deploy = **HF Spaces** (Docker) + **Neon** (Postgres + pgvector); vector backend = **pgvector** (canonical), Chroma local-dev only. | Fully free & durable. Render rejected: free Postgres expires in 30 days, persistent disk is paid-only. pgvector removes the paid-disk need. |
+| 2026-07-14 | Relational store (Phase 2) = **SQLite locally / Neon Postgres in prod** via one `DATABASE_URL`. | Zero-setup local testing (free), same code in prod. Mirrors the Chroma/pgvector split. |

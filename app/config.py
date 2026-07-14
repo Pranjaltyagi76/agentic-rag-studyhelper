@@ -27,6 +27,11 @@ class Settings:
     CHROMA_DIR: str = os.getenv("CHROMA_DIR", "Chromadb")
     CHROMA_COLLECTION: str = os.getenv("CHROMA_COLLECTION", "Stuff")
 
+    # --- Relational store (sessions, documents) ---
+    # Local dev/test defaults to SQLite (zero setup); deploy sets DATABASE_URL to
+    # Neon Postgres. Same code, config-only swap — mirrors the Chroma/pgvector split.
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./studyhelper.db")
+
     # --- Ingestion / OCR ---
     UPLOAD_FOLDER: str = os.getenv("UPLOAD_FOLDER", "uploads")
     OCR_MODEL: str = os.getenv("OCR_MODEL", "gemini-2.5-flash")

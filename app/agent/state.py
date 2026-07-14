@@ -51,6 +51,7 @@ class QuizEval(BaseModel):
 
 
 class AgentState(TypedDict):
+    session_id: str
     query: str
     plan: PlannerState | None
     uploaded_files: list[str]

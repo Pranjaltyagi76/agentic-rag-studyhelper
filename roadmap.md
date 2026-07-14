@@ -26,12 +26,16 @@
   `uvicorn app.main:app --port 8000` and exercise the flow. Byte-compile + import
   graph checks passed.
 
-## Phase 2 — Sessions & multi-user isolation (FR-6, NFR-1)
-- [ ] Remove global `current_agent_state` / `uploaded_files` (`app.py:36`).
-- [ ] Add `session_id` to all endpoints + state.
-- [ ] Postgres `sessions`, `messages`, `documents` tables.
-- [ ] Vector filter includes `session_id` (fix `RAG_Tool`, `Agent.py:226`).
-- **DoD:** two concurrent sessions are fully isolated (acceptance test).
+## Phase 2 — Sessions & multi-user isolation (FR-6, NFR-1) ✅ (code complete; boot pending deps+keys)
+- [x] Remove global `current_agent_state` / `uploaded_files` → per-`session_id` store (A1).
+- [x] Add `session_id` to all endpoints + `AgentState` + the frontend (localStorage).
+- [x] Relational `sessions` + `documents` tables via SQLAlchemy (SQLite local / Neon Postgres prod).
+      (`messages` table deferred to Phase 5 with the checkpointer.)
+- [x] Vector filter includes `session_id` (fixed `RAG_Tool`, A3) + `session_id` in chunk metadata.
+- **DoD:** two concurrent sessions are isolated — different `session_id` → separate
+  uploads, separate retrieval, separate quiz state. ⚠️ Verify at runtime (user testing).
+- **Note:** transient agent state (quiz for `/evaluate`) is in-memory per session; it
+  is isolated but not yet durable across restart (durability = Phase 5).
 
 ## Phase 3 — Self-corrective retrieval subgraph (FR-2.2, FR-2.3)
 - [ ] `plan_retrieval` → `retrieve` → `grade_docs` → `decide_next` → `web_fallback`.

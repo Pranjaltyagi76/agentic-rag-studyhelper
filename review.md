@@ -13,9 +13,9 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 
 | # | Sev | Issue | Location | Fix in phase |
 |---|-----|-------|----------|--------------|
-| A1 | 🔴 | Global mutable `current_agent_state` & `uploaded_files` — not multi-user safe; users overwrite each other. | `app.py:36`, `app.py:56` | Phase 2 |
+| A1 | ✅ 🔴 | ~~Global mutable `current_agent_state` & `uploaded_files`.~~ **RESOLVED (Phase 2):** per-`session_id` in-memory store (`app/api/session_store.py`) for transient state; per-session uploads from the DB. No cross-user overwrite. | `app/api/session_store.py` | Phase 2 ✅ |
 | A2 | ✅ 🔴 | ~~Embedding mismatch.~~ **RESOLVED (Phase 1):** the Google embeddings in the old `ingest.py` were *unused dead code* — the real pipeline already embedded with HF `all-MiniLM-L6-v2` via `vectordb.add_documents`. So there was no live mismatch, only misleading code. Removed the dead Google embeddings; HF is the single embedder in `app/persistence/vectorstore.py`. No re-ingestion needed. | `app/persistence/vectorstore.py`, `app/ingest/ingest.py` | Phase 1 ✅ |
-| A3 | 🟠 | Vector retrieval filters by `file_name` only — no `session_id`; cross-user data leak once multi-user. | `app/agent/retrieval.py` `RAG_Tool` | Phase 2 |
+| A3 | ✅ 🟠 | ~~Vector retrieval filters by `file_name` only.~~ **RESOLVED (Phase 2):** `RAG_Tool` filters by `session_id` (always) + `file_name`; chunks carry `session_id` metadata. A session can only retrieve its own docs. | `app/agent/retrieval.py`, `app/ingest/ingest.py` | Phase 2 ✅ |
 | A4 | 🟠 | `messages` is always passed empty → no memory despite `add_messages` reducer. | `app/api/chat.py` | Phase 5 |
 | A5 | ✅ 🟡 | ~~Unused HF `DeepSeek-V4-Flash` model.~~ **RESOLVED (Phase 1):** dropped during the refactor; not carried into `app/`. | (was `app.py:19-25`) | Phase 1 ✅ |
 | A6 | 🟡 | No relevance grading — retrieved chunks used as-is (naive, not advanced). | `teacher_node`, `quiz_generator_node` | Phase 3 |
@@ -26,6 +26,7 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 | A11 | 🔵 | No tests. | repo | ongoing |
 | A12 | 🟠 | `requirements.txt` (frozen) is **missing packages the code imports**: `langchain-groq`, `langchain-tavily`, `sentence-transformers`, `pypdf`. Implies the original code was never fully run in that env. **Partly fixed (Phase 1):** added them (unpinned) at the bottom of `requirements.txt`; must `pip install -r requirements.txt` and re-freeze to pin. | `requirements.txt` | Phase 1 (verify on install) |
 | A13 | 🔵 | Local HF embeddings pull `sentence-transformers` + `torch` (large download). Fine for free tier but slows first boot; note for HF Spaces build. | `app/persistence/vectorstore.py` | Phase 7/9 |
+| A14 | 🔵 | Any vectors ingested BEFORE Phase 2 lack `session_id` metadata, so they won't match the session filter. Not a code bug — just re-upload docs after Phase 2 (or wipe `Chromadb/`). | `Chromadb/` | note only |
 
 ---
 
@@ -63,7 +64,7 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 
 | Test | Phase | Status |
 |---|---|---|
-| Two sessions isolated (no cross-read) | 2 | ⬜ |
+| Two sessions isolated (no cross-read) | 2 | 🧪 ready to test (code complete) |
 | Restart resumes in-flight session | 5 | ⬜ |
 | Irrelevant chunks dropped + re-retrieval fires | 3 | ⬜ |
 | Ungrounded generation → regenerate/flag | 4 | ⬜ |

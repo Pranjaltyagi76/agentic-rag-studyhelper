@@ -1,22 +1,33 @@
 """FastAPI application entry point.
 
-Run locally with:  uvicorn app.main:app --reload
+Run locally with:  uvicorn app.main:app --reload --port 8000
 On Hugging Face Spaces the container serves this on port 7860 (see deployment.md).
 
-Phase 1: assembles the same three endpoints as the original app.py, now split into
-routers. ``/health`` is a small addition used by Docker/HF healthchecks (deployment
-.md section 7); the streaming variant of ``/chat`` arrives in Phase 6.
+Phase 1: split the original app.py into routers + added /health.
+Phase 2: session-scoped endpoints (session_id) + relational store; tables are created
+on startup via the lifespan hook.
 """
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.persistence.db import init_db
 from app.api import upload, chat, evaluate
 
-app = FastAPI(title="Agentic RAG Study Helper")
 
-# NOTE (audit A9): wildcard CORS is carried over from the original app.py for
-# behavior parity; tighten before deploy (Phase 7).
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create tables if they do not exist (SQLite locally / Neon Postgres in prod).
+    init_db()
+    yield
+
+
+app = FastAPI(title="Agentic RAG Study Helper", lifespan=lifespan)
+
+# NOTE (audit A9): wildcard CORS is carried over for behavior parity; tighten before
+# deploy (Phase 7).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
