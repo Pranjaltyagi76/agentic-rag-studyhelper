@@ -17,7 +17,11 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.persistence.db import init_db
+from app.observability.tracing import setup_langsmith, setup_otel
 from app.api import upload, chat, evaluate
+
+# Enable LangSmith tracing as early as possible (no-op until LANGCHAIN_API_KEY is set).
+setup_langsmith()
 
 
 @asynccontextmanager
@@ -28,6 +32,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Agentic RAG Study Helper", lifespan=lifespan)
+
+# Instrument the FastAPI layer with OpenTelemetry (Phase 8).
+setup_otel(app)
 
 # NOTE (audit A9): wildcard CORS is carried over for behavior parity; tighten before
 # deploy (Phase 7).

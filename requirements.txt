@@ -40,6 +40,9 @@ fastembed
 pypdf
 google-genai
 
+# --- Observability (LangSmith comes with langchain; add OTel FastAPI instrumentation) ---
+opentelemetry-instrumentation-fastapi
+
 # --- Persistence ---
 SQLAlchemy
 psycopg2-binary

@@ -85,11 +85,15 @@
 - **DoD:** `docker compose up --build` → working stack on pgvector (needs Docker; not
   runnable in this dev sandbox — code + compose validated, user runs to confirm).
 
-## Phase 8 — Observability (NFR-3)
-- [ ] **LangSmith** tracing on every node + LLM call (env: `LANGCHAIN_TRACING_V2`).
-- [ ] Retrieval-quality metrics (grade pass rate, retries, groundedness rate).
-- [ ] OpenTelemetry on FastAPI layer.
-- **DoD:** every request is traceable end-to-end in LangSmith.
+## Phase 8 — Observability (NFR-3) ✅ (wired; live LangSmith needs the user's key)
+- [x] **LangSmith** tracing via `app/observability/tracing.py` — auto-enables when
+      `LANGCHAIN_API_KEY` is set (no-op otherwise); `/chat` runs tagged (`run_name`,
+      `tags`, `metadata`) for filterable traces.
+- [x] Retrieval-quality metrics (`app/observability/metrics.py`): grade pass rate +
+      attempt from the grader, grounded + attempts from the teacher (structured logs).
+- [x] OpenTelemetry instruments the FastAPI layer; OTLP export if endpoint configured.
+- **DoD:** wiring verified (tracing correctly OFF without key, OTel instruments, metrics
+  emit, app serves). End-to-end LangSmith trace confirmed once the user adds their key.
 
 ## Phase 8.5 — Evaluation (NFR-9, post-M2)
 - [ ] Curate a small RAG eval set (questions + expected/reference answers per doc).

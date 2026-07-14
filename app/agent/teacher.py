@@ -14,6 +14,7 @@ from app.agent.llm import model
 from app.agent.structured import structured_invoke
 from app.agent.retrieval import run_retrieval
 from app.agent.state import AgentState
+from app.observability.metrics import log_groundedness
 
 
 def _history_text(state: AgentState) -> str:
@@ -189,6 +190,8 @@ def teacher_node(state: AgentState):
             break
 
         feedback = "; ".join(verdict.unsupported_claims) or "unsupported claims present"
+
+    log_groundedness(grounded, attempt)
 
     return {
         "lesson": lesson,

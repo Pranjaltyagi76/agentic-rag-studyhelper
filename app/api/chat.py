@@ -61,10 +61,20 @@ def _sse(payload: dict) -> str:
     return f"data: {json.dumps(jsonable_encoder(payload))}\n\n"
 
 
+def _run_config(session_id: str) -> dict:
+    """LangGraph/LangSmith config: durable thread + trace name/tags/metadata (Phase 8)."""
+    return {
+        "configurable": {"thread_id": session_id},
+        "run_name": "chat",
+        "tags": ["chat"],
+        "metadata": {"session_id": session_id},
+    }
+
+
 @router.post("/chat")
 def chat(input: TextInput, db: Session = Depends(get_db)):
     uploaded_files = list_filenames(db, input.session_id)
-    config = {"configurable": {"thread_id": input.session_id}}
+    config = _run_config(input.session_id)
     result = agent.invoke(_build_turn(input.session_id, input.query, uploaded_files), config=config)
     return {"state": _clean(result)}
 
@@ -73,7 +83,7 @@ def chat(input: TextInput, db: Session = Depends(get_db)):
 def chat_stream(input: TextInput, db: Session = Depends(get_db)):
     # Fetch files before streaming starts (the db session closes when this returns).
     uploaded_files = list_filenames(db, input.session_id)
-    config = {"configurable": {"thread_id": input.session_id}}
+    config = _run_config(input.session_id)
     turn = _build_turn(input.session_id, input.query, uploaded_files)
 
     def gen():

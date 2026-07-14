@@ -23,6 +23,7 @@ from langgraph.graph import StateGraph, START, END
 
 from app.config import settings
 from app.agent.structured import structured_invoke
+from app.observability.metrics import log_retrieval_grade
 from app.persistence.vectorstore import vectordb
 
 search = TavilySearch(max_results=settings.TAVILY_MAX_RESULTS)
@@ -213,6 +214,7 @@ def _grade(state: RetrievalState) -> dict:
     )
 
     picked = [raw[i] for i in grade.relevant_ids if 0 <= i < len(raw)]
+    log_retrieval_grade(len(picked), len(raw), state.get("attempts", 0))
 
     # Accumulate relevant docs across retries, de-duplicated by content.
     merged = list(state.get("relevant_docs") or [])

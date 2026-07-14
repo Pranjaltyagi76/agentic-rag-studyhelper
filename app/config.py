@@ -60,5 +60,13 @@ class Settings:
     # Retries for structured LLM calls before salvaging / defaulting.
     STRUCTURED_MAX_RETRIES: int = int(os.getenv("STRUCTURED_MAX_RETRIES", "2"))
 
+    # --- Observability (Phase 8) ---
+    # LangSmith tracing turns on automatically once LANGCHAIN_API_KEY is set; empty = off.
+    LANGCHAIN_API_KEY: str | None = os.getenv("LANGCHAIN_API_KEY") or None
+    LANGCHAIN_PROJECT: str = os.getenv("LANGCHAIN_PROJECT", "studyhelper")
+    LANGCHAIN_ENDPOINT: str = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
+    # OpenTelemetry: FastAPI is always instrumented; spans are exported only if set.
+    OTEL_EXPORTER_OTLP_ENDPOINT: str | None = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or None
+
 
 settings = Settings()
