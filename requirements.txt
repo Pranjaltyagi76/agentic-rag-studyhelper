@@ -43,6 +43,9 @@ google-genai
 # --- Observability (LangSmith comes with langchain; add OTel FastAPI instrumentation) ---
 opentelemetry-instrumentation-fastapi
 
+# --- Evaluation (Phase 8.5): offline RAG quality scoring, logged to MLflow (local) ---
+mlflow
+
 # --- Persistence ---
 SQLAlchemy
 psycopg2-binary

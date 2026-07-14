@@ -68,5 +68,10 @@ class Settings:
     # OpenTelemetry: FastAPI is always instrumented; spans are exported only if set.
     OTEL_EXPORTER_OTLP_ENDPOINT: str | None = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or None
 
+    # --- Evaluation (Phase 8.5) — MLflow, local SQLite backend by default ---
+    # (recent MLflow deprecated the ./mlruns file store; SQLite is the local backend.)
+    MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+    MLFLOW_EXPERIMENT_NAME: str = os.getenv("MLFLOW_EXPERIMENT_NAME", "studyhelper-rag-eval")
+
 
 settings = Settings()

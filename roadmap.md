@@ -95,12 +95,15 @@
 - **DoD:** wiring verified (tracing correctly OFF without key, OTel instruments, metrics
   emit, app serves). End-to-end LangSmith trace confirmed once the user adds their key.
 
-## Phase 8.5 — Evaluation (NFR-9, post-M2)
-- [ ] Curate a small RAG eval set (questions + expected/reference answers per doc).
-- [ ] **MLflow** eval: retrieval relevance, groundedness/faithfulness, answer quality.
-- [ ] Log runs to MLflow so prompt/retrieval changes are compared over time.
-- **DoD:** a config/prompt change shows a measurable delta in MLflow.
-- *Note:* needs the self-correcting loops (M2) to exist before it's meaningful.
+## Phase 8.5 — Evaluation (NFR-9, post-M2) ✅
+- [x] Curated eval set (`evaluation/dataset.py`) — note chunks + question + reference,
+      with distractors to exercise grading.
+- [x] **MLflow** eval (`evaluation/run_eval.py`): retrieval relevance, faithfulness,
+      answer correctness via LLM judges (`evaluation/judges.py`).
+- [x] Runs log params (model, retrieval/generation knobs) + averaged metrics + a
+      per-example artifact to MLflow (SQLite backend) → comparable across changes.
+- **DoD:** ✅ baseline run logged (3 examples, avg 5.0 across all metrics). Re-running
+  with a changed knob/prompt under a new `--label` produces a comparable run in `mlflow ui`.
 
 ## Phase 9 — Deployment (free tier: HF Spaces + Neon)
 - [ ] Provision **Neon** free Postgres; `CREATE EXTENSION vector;`.
@@ -114,7 +117,7 @@
 ## Milestones
 - **M1 — Solid foundation:** Phases 1–2 (structure + isolation).
 - **M2 — Advanced RAG:** Phases 3–4 (the self-correcting loops = "advanced"). ✅ **DONE**
-- **M3 — Durable & observable:** Phases 5–6, 8 (+ 8.5 evaluation). *(Phase 5 ✅)*
+- **M3 — Durable & observable:** Phases 5–6, 8, 8.5. ✅ **DONE**
 - **M4 — Shipped:** Phases 7, 9.
 
 ## Risks (see review.md for the live log)

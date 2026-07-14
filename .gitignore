@@ -13,6 +13,8 @@ env/
 uploads/
 Chromadb/
 mlruns/
+mlflow.db
+mlartifacts/
 *.db
 studyhelper.db
 *.sqlite
