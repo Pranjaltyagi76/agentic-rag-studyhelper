@@ -13,6 +13,21 @@ load_dotenv()
 
 
 class Settings:
+    # --- App / security ---
+    APP_ENV: str = os.getenv("APP_ENV", "development")
+    # Comma-separated allowed origins for CORS. "*" (default) = any origin (dev only).
+    CORS_ALLOW_ORIGINS: str = os.getenv("CORS_ALLOW_ORIGINS", "*")
+    # Optional API key gate: when set, every endpoint (except /health) requires it.
+    APP_API_KEY: str | None = os.getenv("APP_API_KEY") or None
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ALLOW_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.lower() == "production"
+
     # --- LLM (reasoning) ---
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 

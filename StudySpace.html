@@ -76,6 +76,22 @@ function getSessionId(){
     }
     return sid;
 }
+
+// JSON headers, plus an optional API key (set localStorage 'app_api_key' when the
+// server has APP_API_KEY configured). For local dev with no key, nothing is added.
+function apiHeaders(){
+    const h = {"Content-Type":"application/json"};
+    const key = localStorage.getItem("app_api_key");
+    if(key) h["X-API-Key"] = key;
+    return h;
+}
+
+function authHeadersOnly(){
+    const h = {};
+    const key = localStorage.getItem("app_api_key");
+    if(key) h["X-API-Key"] = key;
+    return h;
+}
 document.getElementById("fileInput").addEventListener("change",e=>{
     selectedFiles.length=0;
     [...e.target.files].forEach(f=>selectedFiles.push(f));
@@ -95,6 +111,7 @@ async function uploadFiles(){
 
     const response=await fetch("http://127.0.0.1:8000/upload",{
         method:"POST",
+        headers:authHeadersOnly(),
         body:formData
     });
 
@@ -128,7 +145,7 @@ async function sendQuery(){
     // Stream node-by-node progress via SSE (Phase 6).
     const response=await fetch("http://127.0.0.1:8000/chat/stream",{
         method:"POST",
-        headers:{"Content-Type":"application/json"},
+        headers:apiHeaders(),
         body:JSON.stringify({session_id:getSessionId(), query})
     });
 
@@ -274,9 +291,7 @@ async function submitAnswer(){
 
         method:"POST",
 
-        headers:{
-            "Content-Type":"application/json"
-        },
+        headers:apiHeaders(),
 
         body:JSON.stringify({
 
