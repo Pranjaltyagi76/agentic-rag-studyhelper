@@ -66,10 +66,13 @@
 - **DoD:** ✅ verified across a genuine process restart — a fresh process loaded the
   session's lesson + message history from the checkpoint and continued the conversation.
 
-## Phase 6 — Streaming API (FR-7.2)
-- [ ] SSE node-by-node progress for `/chat`.
-- [ ] Consistent error envelope + `/health`.
-- **DoD:** client sees incremental progress; errors are structured.
+## Phase 6 — Streaming API (FR-7.2) ✅
+- [x] SSE `/chat/stream` emits node-by-node progress then a final-state event; `/chat`
+      (non-streaming) kept for compatibility. Frontend consumes the stream + shows progress.
+- [x] Consistent error envelope `{ "error": { code, message, detail? } }` via exception
+      handlers (HTTP + validation + unhandled); `/health` (from Phase 1).
+- **DoD:** ✅ verified — TestClient saw progress events + final lesson over
+  text/event-stream; 400 and 422 both returned the structured envelope.
 
 ## Phase 7 — Docker (NFR-4, NFR-5)
 - [ ] Multi-stage `Dockerfile` (port 7860 for HF Spaces).

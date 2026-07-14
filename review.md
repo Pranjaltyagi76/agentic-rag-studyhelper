@@ -23,7 +23,7 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 | A7 | ✅ 🟡 | ~~No groundedness/hallucination check.~~ **RESOLVED (Phase 4):** teacher verifies the lesson against its sources and regenerates (cap `GENERATION_MAX_ATTEMPTS`), flagging unsupported claims if still ungrounded. | `app/agent/teacher.py` | Phase 4 ✅ |
 | A8 | ✅ 🟡 | ~~"Adaptive" planner is static replay.~~ **RESOLVED (Phase 4):** planner adapts on a failure signal (ungrounded lesson) — inserts a corrective task or finishes early, capped by `REPLAN_MAX`; `executor` honors an early-finish flag. | `app/agent/planner.py`, `app/agent/graph.py` | Phase 4 ✅ |
 | A9 | 🟡 | CORS `allow_origins=["*"]` with credentials — tighten before deploy. | `app.py:29` | Phase 7 |
-| A10 | 🔵 | No `/health`, no structured error envelope, no streaming. | `app.py` | Phase 6 |
+| A10 | ✅ 🔵 | ~~No `/health`, error envelope, or streaming.~~ **RESOLVED:** `/health` (Phase 1); SSE `/chat/stream` + `{error:{code,message,detail?}}` envelope (Phase 6). | `app/main.py`, `app/api/chat.py` | Phase 6 ✅ |
 | A11 | 🔵 | No tests. | repo | ongoing |
 | A12 | ✅ 🟠 | ~~`requirements.txt` missing imported packages / conflicting pins.~~ **RESOLVED:** replaced the broken freeze with a curated `requirements.txt`; venv built cleanly on Python 3.13; exact versions captured in `requirements.lock.txt`. | `requirements.txt`, `requirements.lock.txt` | ✅ |
 | A13 | ✅ 🔵 | ~~Local HF embeddings pull `sentence-transformers` + `torch` (~2.5 GB).~~ **RESOLVED:** switched embedding runtime to **fastembed (ONNX)** — same model, ~15 MB + one-time ~83 MB model download, no torch. Much lighter for free HF Spaces. | `app/persistence/vectorstore.py` | ✅ |

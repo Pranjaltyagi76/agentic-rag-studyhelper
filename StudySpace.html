@@ -119,22 +119,55 @@ async function sendQuery(){
     const query=document.getElementById("query").value.trim();
     if(!query) return;
 
-    const response=await fetch("http://127.0.0.1:8000/chat",{
+    const teacher=document.getElementById("teacherContent");
+    const steps=[];
+    const renderSteps=()=>{
+        teacher.innerHTML="<em>"+steps.map(s=>"⏳ "+s+"…").join("<br>")+"</em>";
+    };
+
+    // Stream node-by-node progress via SSE (Phase 6).
+    const response=await fetch("http://127.0.0.1:8000/chat/stream",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({session_id:getSessionId(), query})
     });
 
-    const data=await response.json();
-    agentstate = data.state
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder();
+    let buffer="";
 
-    if(agentstate.lesson){
-        document.getElementById("teacherContent").innerHTML =
-    marked.parse(agentstate.lesson);
-    }
-    if(agentstate.quiz){
-        currentQuestionIndex = 0;
-        renderQuiz(agentstate.quiz);
+    while(true){
+        const {value,done}=await reader.read();
+        if(done) break;
+        buffer+=decoder.decode(value,{stream:true});
+
+        let idx;
+        while((idx=buffer.indexOf("\n\n"))>=0){
+            const raw=buffer.slice(0,idx).trim();
+            buffer=buffer.slice(idx+2);
+            if(!raw.startsWith("data:")) continue;
+
+            const evt=JSON.parse(raw.slice(5).trim());
+
+            if(evt.type==="progress" && evt.node!=="start"){
+                if(steps[steps.length-1]!==evt.message){ steps.push(evt.message); renderSteps(); }
+            }
+            else if(evt.type==="final"){
+                agentstate=evt.state;
+                if(agentstate.lesson){
+                    teacher.innerHTML=marked.parse(agentstate.lesson);
+                }else if(!agentstate.quiz){
+                    teacher.innerHTML="<em>Done.</em>";
+                }
+                if(agentstate.quiz){
+                    currentQuestionIndex=0;
+                    renderQuiz(agentstate.quiz);
+                }
+            }
+            else if(evt.type==="error"){
+                teacher.innerHTML="<span style='color:#f87171'>Error: "+evt.error.message+"</span>";
+            }
+        }
     }
 }
 
@@ -260,7 +293,7 @@ async function submitAnswer(){
 
     const err = await response.json();
 
-    alert(err.detail);
+    alert((err.error && err.error.message) || "Request failed");
 
     return;
 }

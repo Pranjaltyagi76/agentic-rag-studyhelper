@@ -10,8 +10,11 @@ on startup via the lifespan hook.
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.persistence.db import init_db
 from app.api import upload, chat, evaluate
@@ -39,6 +42,32 @@ app.add_middleware(
 app.include_router(upload.router)
 app.include_router(chat.router)
 app.include_router(evaluate.router)
+
+
+# --- Consistent error envelope (Phase 6): { "error": { code, message, detail? } } ---
+@app.exception_handler(StarletteHTTPException)
+async def _http_exc(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": exc.status_code, "message": exc.detail}},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exc(request: Request, exc: RequestValidationError):
+    detail = [{"loc": list(e.get("loc", [])), "msg": e.get("msg")} for e in exc.errors()]
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": 422, "message": "Invalid request", "detail": detail}},
+    )
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exc(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"error": {"code": 500, "message": "Internal server error", "detail": str(exc)}},
+    )
 
 
 @app.get("/health")
