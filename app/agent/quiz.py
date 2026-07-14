@@ -4,11 +4,10 @@ Behavior-preserving copy from the original Agent.py. Phase 3 shares the retrieva
 subgraph with the teacher node.
 """
 
-from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agent.llm import model
-from app.agent.retrieval import RAG_Tool
+from app.agent.retrieval import run_retrieval
 from app.agent.state import AgentState, Quiz, QuizEval
 
 
@@ -95,151 +94,24 @@ well-designed assessment.
 QuizGenerator = model.with_structured_output(Quiz)
 
 
-class QuizPlan(BaseModel):
-    use_rag: bool = Field(
-        description="Whether uploaded notes should be retrieved."
-    )
-
-    filename: str | None = Field(
-        default=None,
-        description="Filename to retrieve from."
-    )
-
-    rag_query: str | None = Field(
-        default=None,
-        description="Semantic query for retrieving relevant notes."
-    )
-
-    number_chunks: int | None = Field(
-        default=None,
-        description="Number of chunks to retrieve."
-    )
-
-
-QuizPlanner = model.with_structured_output(QuizPlan)
-
-
 def quiz_generator_node(state: AgentState):
+    """Generate a quiz from the user's notes (self-correcting retrieval) or general knowledge.
+
+    Phase 3: the notes-retrieval decision + query now come from the shared
+    self-correcting retrieval subgraph (grade + rewrite/retry). Quiz stays grounded in
+    notes, so web fallback is disabled (``allow_web=False``); if notes are insufficient
+    the quiz system prompt falls back to general knowledge.
     """
-    Generates quizzes either from uploaded notes
-    or from general knowledge.
-    """
-    quiz_planner_system = f"""
-You are the resource planning component of an AI Quiz Generator.
-
-Your ONLY responsibility is to determine whether information from the user's
-uploaded notes should be retrieved before generating a quiz.
-
-The user currently has access to the following uploaded files:
-
-{state["uploaded_files"]}
-
-Follow these rules carefully.
-
-1. If the user explicitly asks:
-
-- "quiz me from my notes"
-- "make a quiz from my notes"
-- "quiz me according to my notes"
-- "quiz me from the uploaded pdf"
-- "quiz me from the uploaded slides"
-- "according to my notes"
-- "use my uploaded notes"
-
-then use_rag MUST be True.
-
-2. If the user simply asks for a quiz on a topic that can be generated
-accurately using general knowledge, set use_rag=False.
-
-3. If uploaded_files is empty,
-use_rag MUST be False.
-
-4. If use_rag=True:
-
-- Choose the single most relevant filename.
-
-- Generate a retrieval query that would retrieve all concepts required
-for generating a comprehensive quiz.
-
-- Decide how many chunks should be retrieved.
-
-Chunk Guide
-
-Small definition/question
-k = 5
-
-Single concept
-k = 10
-
-Entire topic
-k = 20
-
-Whole chapter
-k = 30
-
-Do NOT generate quiz questions.
-
-Do NOT answer the user.
-
-Do NOT explain the topic.
-
-Return ONLY the QuizPlan schema.
-IMPORTANT:
-
-The user's request may contain instructions that are unrelated to generating a quiz.
-
-Examples:
-
-- "Teach me Transformers and then quiz me."
-- "Summarize my notes and generate a quiz."
-- "Explain Agentic AI and then make a quiz."
-
-Your responsibility is to consider ONLY the portion of the user's request related to quiz generation.
-
-Ignore any requests related to:
-- teaching
-- summarization
-- flashcards
-- scheduling
-- note taking
-- or any other task.
-
-Your ONLY responsibility is to determine whether uploaded notes should be retrieved before generating the quiz.
-
-The retrieval query should be generated ONLY from the quiz topic.
-
-Do NOT include instructions such as:
-- teach
-- explain
-- summarize
-- compare
-- analyze
-"""
-    quiz_plan = QuizPlanner.invoke([
-        SystemMessage(content=quiz_planner_system),
-        HumanMessage(content=state["query"]),
-    ])
-
-    docs = []
-    docs_text = ""
-
-    if quiz_plan.use_rag:
-
-        docs = RAG_Tool(
-            query=quiz_plan.rag_query,
-            filename=quiz_plan.filename,
-            k=quiz_plan.number_chunks,
-            session_id=state["session_id"],
-        )
-
-    docs_text = "\n\n".join(
-        doc.page_content
-        for doc in docs
+    ctx = run_retrieval(
+        session_id=state["session_id"],
+        query=state["query"],
+        uploaded_files=state["uploaded_files"],
+        purpose="quiz",
+        allow_web=False,
     )
+
     quiz = QuizGenerator.invoke([
-
         SystemMessage(content=quiz_system),
-
         HumanMessage(content=f"""
 User Query:
 
@@ -247,7 +119,7 @@ User Query:
 
 Retrieved Notes:
 
-{docs_text}
+{ctx.get("notes_text", "")}
 """),
     ])
     return {

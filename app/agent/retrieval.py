@@ -1,22 +1,36 @@
-"""Retrieval + web-research tools.
+"""Retrieval tools + the self-correcting retrieval subgraph (Phase 3).
 
-Phase 1: the two tools (`RAG_Tool`, `research_tool`) lifted from the original
-Agent.py, unchanged in behavior. Phase 3 turns this into the self-correcting
-retrieval subgraph (rewrite -> retrieve -> grade -> retry -> web fallback) described
-in design.md section 3.
+Phase 2 gave us session-scoped tools. Phase 3 wraps them in a small LangGraph
+subgraph that grades what it retrieves and retries with a rewritten query before
+falling back to the web — the CRAG-style loop from design.md section 3:
 
-Phase 2 (audit A3 resolved): `RAG_Tool` now filters by `session_id` (always) plus
-`file_name` (when known), so a session can only ever retrieve its own documents.
+    plan_retrieval -> retrieve -> grade -> (rewrite -> retrieve)*  -> plan_web -> web_fetch
+                          ^__________________________|   (<= RETRIEVAL_MAX_ATTEMPTS)
+
+The subgraph is shared by the teacher and quiz nodes via ``run_retrieval``. It
+returns the graded notes text and any web material; the caller then generates.
+
+Isolation (A3): ``RAG_Tool`` always filters by ``session_id``.
+Termination: the rewrite loop is capped by ``settings.RETRIEVAL_MAX_ATTEMPTS``.
 """
 
+from typing_extensions import TypedDict
+
+from pydantic import BaseModel, Field
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_tavily import TavilySearch
+from langgraph.graph import StateGraph, START, END
 
 from app.config import settings
+from app.agent.llm import model
 from app.persistence.vectorstore import vectordb
 
 search = TavilySearch(max_results=settings.TAVILY_MAX_RESULTS)
 
 
+# --------------------------------------------------------------------------- #
+# Tools
+# --------------------------------------------------------------------------- #
 def RAG_Tool(query: str, filename: str | None, k: int, session_id: str):
     """Fetch relevant documents for the query from THIS session's uploaded documents.
 
@@ -28,30 +42,296 @@ def RAG_Tool(query: str, filename: str | None, k: int, session_id: str):
         conditions.append({"file_name": filename})
     where = conditions[0] if len(conditions) == 1 else {"$and": conditions}
 
-    retriever = vectordb.as_retriever(
-        search_kwargs={
-            "k": k,
-            "filter": where,
-        }
-    )
-    docs = retriever.invoke(query)
-    return docs
+    retriever = vectordb.as_retriever(search_kwargs={"k": k, "filter": where})
+    return retriever.invoke(query)
 
 
 def research_tool(queries: list[str]):
-    """
-    Searches the web for up-to-date information.
-
-    Use this tool only when the user's uploaded notes are
-    insufficient or outdated.
-
-    Args:
-        queries: Concise web search queries.
-
-    Returns:
-        Relevant web search results.
-    """
+    """Search the web for up-to-date information (fallback when notes are weak)."""
     results = []
     for query in queries:
         results += search.invoke(query)
     return results
+
+
+# --------------------------------------------------------------------------- #
+# Schemas (structured LLM outputs)
+# --------------------------------------------------------------------------- #
+class RetrievalPlan(BaseModel):
+    use_rag: bool = Field(description="Whether to retrieve from the user's uploaded notes.")
+    filename: str | None = Field(default=None, description="Single most relevant uploaded filename.")
+    rag_query: str | None = Field(default=None, description="Semantic query to send to the retriever.")
+    number_chunks: int | None = Field(default=None, description="How many chunks to fetch.")
+
+
+class DocsGrade(BaseModel):
+    relevant_ids: list[int] = Field(
+        default_factory=list, description="Indices of the chunks that are relevant to the query."
+    )
+    sufficient: bool = Field(
+        description="True if the relevant chunks together are enough to answer the query."
+    )
+    missing: str | None = Field(
+        default=None, description="What information is still missing, if not sufficient."
+    )
+
+
+class QueryRewrite(BaseModel):
+    rag_query: str = Field(description="An improved retrieval query targeting the missing information.")
+
+
+class WebPlan(BaseModel):
+    use_web: bool = Field(description="Whether a web search is needed to answer well.")
+    web_queries: list[str] | None = Field(default=None, description="Concise web search queries.")
+
+
+# --------------------------------------------------------------------------- #
+# Subgraph state
+# --------------------------------------------------------------------------- #
+class RetrievalState(TypedDict, total=False):
+    # inputs
+    session_id: str
+    query: str
+    uploaded_files: list[str]
+    purpose: str          # "teach" | "quiz" — tunes planning
+    allow_web: bool
+
+    # retrieval plan
+    use_rag: bool
+    filename: str | None
+    rag_query: str | None
+    k: int
+
+    # loop state
+    attempts: int
+    raw_docs: list
+    relevant_docs: list
+    sufficient: bool
+    missing: str | None
+
+    # web
+    use_web: bool
+    web_queries: list[str]
+
+    # outputs
+    notes_text: str
+    web_material: str
+
+
+# --------------------------------------------------------------------------- #
+# Node prompts
+# --------------------------------------------------------------------------- #
+_GRADE_SYSTEM = """You grade retrieved note chunks for relevance to a user's query.
+
+You are given the query and a numbered list of chunks. Decide which chunks are
+relevant, and whether the relevant ones together are SUFFICIENT to answer the query.
+
+Rules:
+- relevant_ids: the indices ([0], [1], ...) of chunks that genuinely help answer the query. Drop off-topic chunks.
+- sufficient: true only if the relevant chunks cover what's needed to answer well.
+- missing: if not sufficient, briefly say what is still missing.
+
+Do NOT answer the query. Return ONLY the DocsGrade schema."""
+
+_REWRITE_SYSTEM = """You improve a retrieval query that returned insufficient results.
+
+Given the original user query, the query that was tried, and what was missing,
+write ONE better semantic retrieval query that targets the missing information.
+Return ONLY the QueryRewrite schema."""
+
+_WEB_SYSTEM = """You decide whether web research is needed before answering.
+
+You are given the user's query, the notes retrieved so far, and whether those notes
+are sufficient. If the notes fully answer the query, set use_web=false. If they are
+missing, outdated, or insufficient, set use_web=true and provide concise web_queries.
+Do NOT answer the query. Return ONLY the WebPlan schema."""
+
+
+# --------------------------------------------------------------------------- #
+# Nodes
+# --------------------------------------------------------------------------- #
+def _plan_retrieval(state: RetrievalState) -> dict:
+    system = f"""You are the retrieval-planning component of an AI Study Assistant.
+
+Purpose of this retrieval: {state.get('purpose', 'teach')}
+Files the user has uploaded: {state.get('uploaded_files', [])}
+
+Decide whether to retrieve from the user's uploaded notes, and if so, plan it.
+
+Rules:
+1. If the user explicitly refers to their notes ("from my notes", "the pdf",
+   "the slides", "according to my notes"), use_rag MUST be True.
+2. If the uploaded files list is empty, use_rag MUST be False.
+3. If the question is fully answerable from general knowledge and notes are not
+   requested, use_rag may be False.
+4. If use_rag is True:
+   - Pick the single most relevant filename from the uploaded files.
+   - Write a focused semantic rag_query for the concepts to retrieve. For a quiz,
+     base it ONLY on the quiz topic; ignore teaching/summarizing instructions.
+   - Choose number_chunks by scope: small question 5, single concept 10,
+     whole topic 20, whole chapter 30.
+
+Do NOT answer or teach. Return ONLY the RetrievalPlan schema."""
+    plan = model.with_structured_output(RetrievalPlan).invoke(
+        [SystemMessage(content=system), HumanMessage(content=state["query"])]
+    )
+    return {
+        "use_rag": bool(plan.use_rag),
+        "filename": plan.filename,
+        "rag_query": plan.rag_query or state["query"],
+        "k": plan.number_chunks or 10,
+    }
+
+
+def _retrieve(state: RetrievalState) -> dict:
+    docs = RAG_Tool(
+        query=state.get("rag_query") or state["query"],
+        filename=state.get("filename"),
+        k=state.get("k", 10),
+        session_id=state["session_id"],
+    )
+    return {"raw_docs": docs, "attempts": state.get("attempts", 0) + 1}
+
+
+def _grade(state: RetrievalState) -> dict:
+    raw = state.get("raw_docs") or []
+    if not raw:
+        return {"sufficient": False, "missing": "No documents were retrieved."}
+
+    numbered = "\n\n".join(f"[{i}] {d.page_content}" for i, d in enumerate(raw))
+    grade = model.with_structured_output(DocsGrade).invoke(
+        [
+            SystemMessage(content=_GRADE_SYSTEM),
+            HumanMessage(content=f"Query:\n{state['query']}\n\nChunks:\n{numbered}"),
+        ]
+    )
+
+    picked = [raw[i] for i in grade.relevant_ids if 0 <= i < len(raw)]
+
+    # Accumulate relevant docs across retries, de-duplicated by content.
+    merged = list(state.get("relevant_docs") or [])
+    seen = {d.page_content for d in merged}
+    for d in picked:
+        if d.page_content not in seen:
+            merged.append(d)
+            seen.add(d.page_content)
+
+    notes_text = "\n\n".join(d.page_content for d in merged)
+    return {
+        "relevant_docs": merged,
+        "notes_text": notes_text,
+        "sufficient": bool(grade.sufficient and picked),
+        "missing": grade.missing,
+    }
+
+
+def _rewrite(state: RetrievalState) -> dict:
+    rewrite = model.with_structured_output(QueryRewrite).invoke(
+        [
+            SystemMessage(content=_REWRITE_SYSTEM),
+            HumanMessage(
+                content=(
+                    f"Original user query:\n{state['query']}\n\n"
+                    f"Query that was tried:\n{state.get('rag_query')}\n\n"
+                    f"What was missing:\n{state.get('missing')}"
+                )
+            ),
+        ]
+    )
+    return {"rag_query": rewrite.rag_query}
+
+
+def _plan_web(state: RetrievalState) -> dict:
+    if not state.get("allow_web"):
+        return {"use_web": False, "web_queries": []}
+
+    plan = model.with_structured_output(WebPlan).invoke(
+        [
+            SystemMessage(content=_WEB_SYSTEM),
+            HumanMessage(
+                content=(
+                    f"Query:\n{state['query']}\n\n"
+                    f"Retrieved notes:\n{state.get('notes_text', '') or '(none)'}\n\n"
+                    f"Notes sufficient: {state.get('sufficient', False)}"
+                )
+            ),
+        ]
+    )
+    return {"use_web": bool(plan.use_web), "web_queries": plan.web_queries or []}
+
+
+def _web_fetch(state: RetrievalState) -> dict:
+    results = research_tool(state.get("web_queries") or [])
+    return {"web_material": str(results)}
+
+
+# --------------------------------------------------------------------------- #
+# Routers
+# --------------------------------------------------------------------------- #
+def _after_plan(state: RetrievalState) -> str:
+    return "retrieve" if state.get("use_rag") else "plan_web"
+
+
+def _after_grade(state: RetrievalState) -> str:
+    if state.get("sufficient"):
+        return "plan_web"
+    if state.get("attempts", 0) < settings.RETRIEVAL_MAX_ATTEMPTS:
+        return "rewrite"
+    # Retries exhausted: proceed; the web step (if allowed) can compensate.
+    return "plan_web"
+
+
+def _after_web(state: RetrievalState):
+    return "web_fetch" if state.get("use_web") else END
+
+
+# --------------------------------------------------------------------------- #
+# Subgraph assembly
+# --------------------------------------------------------------------------- #
+_g = StateGraph(RetrievalState)
+_g.add_node("plan_retrieval", _plan_retrieval)
+_g.add_node("retrieve", _retrieve)
+_g.add_node("grade", _grade)
+_g.add_node("rewrite", _rewrite)
+_g.add_node("plan_web", _plan_web)
+_g.add_node("web_fetch", _web_fetch)
+
+_g.add_edge(START, "plan_retrieval")
+_g.add_conditional_edges("plan_retrieval", _after_plan, {"retrieve": "retrieve", "plan_web": "plan_web"})
+_g.add_edge("retrieve", "grade")
+_g.add_conditional_edges("grade", _after_grade, {"rewrite": "rewrite", "plan_web": "plan_web"})
+_g.add_edge("rewrite", "retrieve")
+_g.add_conditional_edges("plan_web", _after_web, {"web_fetch": "web_fetch", END: END})
+_g.add_edge("web_fetch", END)
+
+retrieval_subgraph = _g.compile()
+
+
+# --------------------------------------------------------------------------- #
+# Public helper
+# --------------------------------------------------------------------------- #
+def run_retrieval(
+    session_id: str,
+    query: str,
+    uploaded_files: list[str],
+    purpose: str = "teach",
+    allow_web: bool = True,
+) -> dict:
+    """Run the self-correcting retrieval subgraph and return its final state.
+
+    Returned keys of interest: ``notes_text`` (graded relevant notes), ``web_material``
+    (web results, if any), ``use_rag``, ``use_web``, ``attempts``, ``sufficient``.
+    """
+    initial: RetrievalState = {
+        "session_id": session_id,
+        "query": query,
+        "uploaded_files": uploaded_files,
+        "purpose": purpose,
+        "allow_web": allow_web,
+        "attempts": 0,
+        "relevant_docs": [],
+        "notes_text": "",
+        "web_material": "",
+        "sufficient": False,
+    }
+    return retrieval_subgraph.invoke(initial)

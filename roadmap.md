@@ -37,11 +37,15 @@
 - **Note:** transient agent state (quiz for `/evaluate`) is in-memory per session; it
   is isolated but not yet durable across restart (durability = Phase 5).
 
-## Phase 3 — Self-corrective retrieval subgraph (FR-2.2, FR-2.3)
-- [ ] `plan_retrieval` → `retrieve` → `grade_docs` → `decide_next` → `web_fallback`.
-- [ ] Retry cap N; query rewrite on weak retrieval.
-- [ ] Shared by teacher & quiz_generator.
-- **DoD:** irrelevant chunks are dropped and re-retrieval fires (traced).
+## Phase 3 — Self-corrective retrieval subgraph (FR-2.2, FR-2.3) ✅
+- [x] `plan_retrieval` → `retrieve` → `grade` → `plan_web` → `web_fetch` subgraph
+      (`app/agent/retrieval.py`), with a `grade → rewrite → retrieve` retry loop.
+- [x] Retry cap `RETRIEVAL_MAX_ATTEMPTS` (default 2); LLM query rewrite on weak retrieval.
+- [x] Shared by teacher (`allow_web=True`) & quiz_generator (`allow_web=False`); their
+      old inline planners are gone.
+- **DoD:** ✅ verified live — grader dropped an irrelevant chunk (Eiffel Tower) while
+  keeping relevant ones (photosynthesis); retry loop wired + capped. Traces will show
+  in LangSmith once Phase 8 enables it.
 
 ## Phase 4 — Generate+verify loop + adaptive planner (FR-2.5, FR-5.3)
 - [ ] Teacher groundedness check + regenerate cap M.

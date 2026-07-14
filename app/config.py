@@ -40,5 +40,10 @@ class Settings:
     # --- Web research ---
     TAVILY_MAX_RESULTS: int = int(os.getenv("TAVILY_MAX_RESULTS", "5"))
 
+    # --- Self-correcting retrieval (Phase 3) ---
+    # Max retrieve->grade->rewrite loops before giving up and falling back to web /
+    # general knowledge. Guarantees termination (design.md section 3).
+    RETRIEVAL_MAX_ATTEMPTS: int = int(os.getenv("RETRIEVAL_MAX_ATTEMPTS", "2"))
+
 
 settings = Settings()
