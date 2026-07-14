@@ -7,12 +7,24 @@ lesson. Phase 4 adds the groundedness verify/regenerate loop (design.md section 
 """
 
 from pydantic import BaseModel, Field
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.config import settings
 from app.agent.llm import model
 from app.agent.retrieval import run_retrieval
 from app.agent.state import AgentState
+
+
+def _history_text(state: AgentState) -> str:
+    """Compact recent conversation (Phase 5 memory), excluding the current query."""
+    msgs = state.get("messages") or []
+    prior = msgs[:-1] if msgs else []  # last message is this turn's query
+    lines = []
+    for m in prior[-6:]:
+        role = "User" if isinstance(m, HumanMessage) else "Assistant"
+        content = (m.content or "")[:500]
+        lines.append(f"{role}: {content}")
+    return "\n".join(lines)
 
 
 class Groundedness(BaseModel):
@@ -104,9 +116,11 @@ Your objective is to make the user genuinely understand the topic.
 """
 
 
-def _generate_lesson(query: str, notes: str, web: str, feedback: str) -> str:
+def _generate_lesson(query: str, notes: str, web: str, feedback: str, history: str = "") -> str:
     """One lesson draft. `feedback` (if any) steers a regeneration toward grounding."""
     human = f"""
+                 Conversation so far (for context; may be empty):
+                 {history}
                  User Query:
                  {query}
                  Retrieved Notes:
@@ -140,6 +154,7 @@ def teacher_node(state: AgentState):
     notes = ctx.get("notes_text", "") or ""
     web = ctx.get("web_material", "") or ""
     sources = (notes + "\n" + web).strip()
+    history = _history_text(state)
 
     grader = model.with_structured_output(Groundedness)
     feedback = ""
@@ -147,7 +162,7 @@ def teacher_node(state: AgentState):
     lesson = ""
 
     for attempt in range(1, settings.GENERATION_MAX_ATTEMPTS + 1):
-        lesson = _generate_lesson(state["query"], notes, web, feedback)
+        lesson = _generate_lesson(state["query"], notes, web, feedback, history)
 
         if not sources:
             # No retrieved/web context to verify against — general-knowledge answer.
@@ -174,5 +189,6 @@ def teacher_node(state: AgentState):
     return {
         "lesson": lesson,
         "grounded": grounded,
+        "messages": [AIMessage(content=lesson)],
         "current_task_index": state["current_task_index"] + 1,
     }

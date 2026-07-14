@@ -16,7 +16,8 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 | A1 | ✅ 🔴 | ~~Global mutable `current_agent_state` & `uploaded_files`.~~ **RESOLVED (Phase 2):** per-`session_id` in-memory store (`app/api/session_store.py`) for transient state; per-session uploads from the DB. No cross-user overwrite. | `app/api/session_store.py` | Phase 2 ✅ |
 | A2 | ✅ 🔴 | ~~Embedding mismatch.~~ **RESOLVED (Phase 1):** the Google embeddings in the old `ingest.py` were *unused dead code* — the real pipeline already embedded with HF `all-MiniLM-L6-v2` via `vectordb.add_documents`. So there was no live mismatch, only misleading code. Removed the dead Google embeddings; HF is the single embedder in `app/persistence/vectorstore.py`. No re-ingestion needed. | `app/persistence/vectorstore.py`, `app/ingest/ingest.py` | Phase 1 ✅ |
 | A3 | ✅ 🟠 | ~~Vector retrieval filters by `file_name` only.~~ **RESOLVED (Phase 2):** `RAG_Tool` filters by `session_id` (always) + `file_name`; chunks carry `session_id` metadata. A session can only retrieve its own docs. | `app/agent/retrieval.py`, `app/ingest/ingest.py` | Phase 2 ✅ |
-| A4 | 🟠 | `messages` is always passed empty → no memory despite `add_messages` reducer. | `app/api/chat.py` | Phase 5 |
+| A4 | ✅ 🟠 | ~~`messages` always empty → no memory.~~ **RESOLVED (Phase 5):** nodes append Human/AI messages, persisted by the checkpointer (SqliteSaver/PostgresSaver) keyed by `session_id`; teacher uses recent history. | `app/agent/*`, `app/persistence/checkpointer.py` | Phase 5 ✅ |
+| A15 | 🔵 | Follow-up/meta queries ("summarize what you taught me") still run strict retrieval+grounding and may hedge; history is available but the teacher grounds against notes. Consider a lightweight "conversational" path that answers from history without retrieval. | `app/agent/teacher.py` | future |
 | A5 | ✅ 🟡 | ~~Unused HF `DeepSeek-V4-Flash` model.~~ **RESOLVED (Phase 1):** dropped during the refactor; not carried into `app/`. | (was `app.py:19-25`) | Phase 1 ✅ |
 | A6 | ✅ 🟡 | ~~No relevance grading — chunks used as-is.~~ **RESOLVED (Phase 3):** shared retrieval subgraph grades chunks (drops irrelevant) + rewrites/retries on weak retrieval, capped by `RETRIEVAL_MAX_ATTEMPTS`. | `app/agent/retrieval.py` | Phase 3 ✅ |
 | A7 | ✅ 🟡 | ~~No groundedness/hallucination check.~~ **RESOLVED (Phase 4):** teacher verifies the lesson against its sources and regenerates (cap `GENERATION_MAX_ATTEMPTS`), flagging unsupported claims if still ungrounded. | `app/agent/teacher.py` | Phase 4 ✅ |
@@ -65,7 +66,7 @@ Severity: 🔴 blocker · 🟠 correctness · 🟡 quality · 🔵 nice-to-have
 | Test | Phase | Status |
 |---|---|---|
 | Two sessions isolated (no cross-read) | 2 | 🧪 ready to test (code complete) |
-| Restart resumes in-flight session | 5 | ⬜ |
+| Restart resumes in-flight session | 5 | ✅ verified — fresh process loaded lesson + messages from checkpoint |
 | Irrelevant chunks dropped + re-retrieval fires | 3 | ✅ drop verified live; retry wired+capped |
 | Ungrounded generation → regenerate/flag | 4 | ✅ check runs live (grounded=True→clean); regen/flag wired+capped |
 | `docker-compose up` full stack works | 7 | ⬜ |

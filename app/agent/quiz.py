@@ -4,7 +4,7 @@ Behavior-preserving copy from the original Agent.py. Phase 3 shares the retrieva
 subgraph with the teacher node.
 """
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.agent.llm import model
 from app.agent.retrieval import run_retrieval
@@ -124,6 +124,7 @@ Retrieved Notes:
     ])
     return {
         "quiz": quiz,
+        "messages": [AIMessage(content=f"Generated a quiz on {quiz.topic} ({len(quiz.questions)} questions).")],
         "current_task_index": state["current_task_index"] + 1,
     }
 
@@ -285,5 +286,6 @@ User Answer:
 
     return {
         "quiz_evaluation": response,
+        "messages": [AIMessage(content=f"Evaluated the answer to question {state['current_question_id']}.")],
         "current_task_index": state["current_task_index"] + 1,
     }

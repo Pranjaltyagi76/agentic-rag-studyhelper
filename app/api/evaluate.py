@@ -1,10 +1,9 @@
-"""/evaluate — evaluate a session's answer to a quiz question."""
+"""/evaluate — evaluate a session's answer, resuming durable state from the checkpoint."""
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.agent.graph import agent
-from app.api.session_store import session_states
 
 router = APIRouter()
 
@@ -17,20 +16,25 @@ class QuizEvaluationInput(BaseModel):
 
 @router.post("/evaluate")
 def evaluate(input: QuizEvaluationInput):
-    state = session_states.get(input.session_id)
+    config = {"configurable": {"thread_id": input.session_id}}
 
-    if state is None:
+    # Load durable state from the checkpoint (survives restarts — Phase 5).
+    snapshot = agent.get_state(config)
+    values = snapshot.values if snapshot else {}
+
+    if not values:
         raise HTTPException(status_code=400, detail="No active session.")
-
-    if state.get("quiz") is None:
+    if values.get("quiz") is None:
         raise HTTPException(status_code=400, detail="Generate a quiz first.")
 
-    state["query"] = "Evaluate the user's answer."
-    state["current_question_id"] = input.question_id
-    state["user_answer"] = input.user_answer
-    state["current_task_index"] = 0
+    turn = {
+        "query": "Evaluate the user's answer.",
+        "current_question_id": input.question_id,
+        "user_answer": input.user_answer,
+        "current_task_index": 0,
+        "plan": None,
+        "finished": False,
+    }
 
-    result = agent.invoke(state)
-    session_states.set(input.session_id, result)
-
+    result = agent.invoke(turn, config=config)
     return {"quiz_evaluation": result["quiz_evaluation"]}

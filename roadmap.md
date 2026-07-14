@@ -56,10 +56,15 @@
   lesson clean; regenerate/flag path wired + capped); planner stays cheap on success
   and adapts only on failure (replans=0 when grounded).
 
-## Phase 5 — Persistence & memory (FR-6.2, FR-6.4, NFR-2)
-- [ ] `PostgresSaver` checkpointer wraps the graph, keyed by `session_id`.
-- [ ] Real conversational `messages` memory across requests.
-- **DoD:** restart mid-session; memory + in-flight state resume.
+## Phase 5 — Persistence & memory (FR-6.2, FR-6.4, NFR-2) ✅
+- [x] Checkpointer wraps the graph, keyed by `thread_id == session_id`
+      (`app/persistence/checkpointer.py`): SqliteSaver local / PostgresSaver on Neon.
+- [x] Real conversational `messages` memory: nodes append Human/AI messages; teacher
+      uses recent history for continuity; persists across requests.
+- [x] Retired the in-memory `session_store`; `/evaluate` now resumes the quiz from the
+      durable checkpoint (survives restart).
+- **DoD:** ✅ verified across a genuine process restart — a fresh process loaded the
+  session's lesson + message history from the checkpoint and continued the conversation.
 
 ## Phase 6 — Streaming API (FR-7.2)
 - [ ] SSE node-by-node progress for `/chat`.
@@ -97,7 +102,7 @@
 ## Milestones
 - **M1 — Solid foundation:** Phases 1–2 (structure + isolation).
 - **M2 — Advanced RAG:** Phases 3–4 (the self-correcting loops = "advanced"). ✅ **DONE**
-- **M3 — Durable & observable:** Phases 5–6, 8 (+ 8.5 evaluation).
+- **M3 — Durable & observable:** Phases 5–6, 8 (+ 8.5 evaluation). *(Phase 5 ✅)*
 - **M4 — Shipped:** Phases 7, 9.
 
 ## Risks (see review.md for the live log)

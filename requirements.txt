@@ -42,3 +42,7 @@ google-genai
 # --- Persistence ---
 SQLAlchemy
 psycopg2-binary
+# LangGraph checkpointers: SQLite for local dev, Postgres (Neon) for deploy.
+langgraph-checkpoint-sqlite
+langgraph-checkpoint-postgres
+psycopg[binary]                # driver PostgresSaver needs (psycopg v3); used in Phase 9

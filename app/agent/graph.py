@@ -11,6 +11,7 @@ from app.agent.state import AgentState
 from app.agent.planner import PlannerNode
 from app.agent.teacher import teacher_node
 from app.agent.quiz import quiz_generator_node, QuizEvaluationNode
+from app.persistence.checkpointer import build_checkpointer
 
 
 def executor(state: AgentState):
@@ -52,4 +53,5 @@ graph.add_edge("teacher", "planner")
 graph.add_edge("quiz_generator", "planner")
 graph.add_edge("quiz_eval", "planner")
 
-agent = graph.compile()
+# Phase 5: durable, resumable state per session (thread_id == session_id).
+agent = graph.compile(checkpointer=build_checkpointer())

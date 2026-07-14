@@ -32,6 +32,11 @@ class Settings:
     # Neon Postgres. Same code, config-only swap — mirrors the Chroma/pgvector split.
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./studyhelper.db")
 
+    # --- LangGraph checkpointer (Phase 5) ---
+    # Separate SQLite file for durable graph state locally; on Postgres (Neon) the
+    # checkpointer shares DATABASE_URL. Backend is chosen from DATABASE_URL's scheme.
+    CHECKPOINT_DB: str = os.getenv("CHECKPOINT_DB", "checkpoints.sqlite")
+
     # --- Ingestion / OCR ---
     UPLOAD_FOLDER: str = os.getenv("UPLOAD_FOLDER", "uploads")
     OCR_MODEL: str = os.getenv("OCR_MODEL", "gemini-2.5-flash")
