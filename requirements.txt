@@ -32,7 +32,8 @@ langchain-tavily
 langchain-chroma
 
 # --- Vector store + embeddings (torch-free) ---
-chromadb
+chromadb                       # local dev backend
+langchain-postgres             # pgvector backend (deploy / docker-compose)
 fastembed
 
 # --- Ingestion ---

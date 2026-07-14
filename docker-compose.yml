@@ -1,0 +1,40 @@
+# Local dev stack that mirrors production (Neon): the app on pgvector Postgres.
+# Usage:  docker compose up --build
+# The app is exposed on host port 8000 (so the existing StudySpace.html, which calls
+# 127.0.0.1:8000, keeps working) and listens on 7860 inside the container.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:7860"
+    env_file:
+      - .env                       # GROQ/GOOGLE/TAVILY keys, etc.
+    environment:
+      # Override to mirror prod: state + checkpoints + vectors all in Postgres.
+      VECTOR_BACKEND: pgvector
+      DATABASE_URL: postgresql://app:app@postgres:5432/studyhelper
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg16   # Postgres 16 with the pgvector extension
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: studyhelper
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d studyhelper"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata: {}

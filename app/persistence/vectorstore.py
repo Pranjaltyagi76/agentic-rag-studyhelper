@@ -1,27 +1,46 @@
 """Vector store wiring.
 
-Embeddings are HF ``all-MiniLM-L6-v2`` (canonical — used for BOTH ingestion and
-query; decision 2026-07-14). This resolves audit item A2: the original ingest.py
-defined an unused Google embeddings object while the real pipeline already embedded
-with this HF model.
+Embeddings are ``all-MiniLM-L6-v2`` (canonical — both ingest and query) running on
+fastembed (ONNX, torch-free); ``onnxruntime`` is already a chromadb dependency.
 
-Embeddings run on fastembed (ONNX) rather than sentence-transformers (PyTorch):
-identical model, but ~15 MB instead of ~2.5 GB and no torch — far lighter for the
-free HF Spaces deploy. ``onnxruntime`` is already a chromadb dependency.
+Backend follows ``settings.VECTOR_BACKEND``:
+  - "chroma"   -> Chroma on a local persistent directory (bare-metal local dev)
+  - "pgvector" -> PGVector in Postgres/Neon (docker-compose + deploy, Phase 7/9)
 
-Backend is Chroma for local dev; pgvector on Neon becomes canonical at deploy
-(Phase 9). Kept behind ``settings.VECTOR_BACKEND`` so the swap is config-only.
+Both are addressed through the same LangChain vector-store interface, so the rest of
+the app is backend-agnostic. Retrieval filters (session_id + file_name) use portable
+``$eq``/``$and`` operators understood by both backends.
 """
 
-from langchain_chroma import Chroma
 from langchain_community.embeddings import FastEmbedEmbeddings
 
 from app.config import settings
 
 embeddings = FastEmbedEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
-vectordb = Chroma(
-    collection_name=settings.CHROMA_COLLECTION,
-    embedding_function=embeddings,
-    persist_directory=settings.CHROMA_DIR,
-)
+
+def _build_vectorstore():
+    if settings.VECTOR_BACKEND == "pgvector":
+        from langchain_postgres import PGVector
+
+        # PGVector uses psycopg v3; map a plain postgresql:// URL to the +psycopg driver.
+        conn = settings.DATABASE_URL
+        if conn.startswith("postgresql://"):
+            conn = "postgresql+psycopg://" + conn[len("postgresql://"):]
+        return PGVector(
+            embeddings=embeddings,
+            collection_name=settings.CHROMA_COLLECTION,
+            connection=conn,
+            use_jsonb=True,
+        )
+
+    from langchain_chroma import Chroma
+
+    return Chroma(
+        collection_name=settings.CHROMA_COLLECTION,
+        embedding_function=embeddings,
+        persist_directory=settings.CHROMA_DIR,
+    )
+
+
+vectordb = _build_vectorstore()

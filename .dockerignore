@@ -1,0 +1,26 @@
+# Keep the build context (and image) small, and NEVER bake secrets/data into the image.
+.git
+.gitignore
+.venv
+venv
+env
+__pycache__
+**/__pycache__
+*.pyc
+
+# Secrets & local runtime data
+.env
+uploads/
+Chromadb/
+*.db
+*.sqlite
+mlruns/
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Docs & scratch (not needed at runtime)
+*.md

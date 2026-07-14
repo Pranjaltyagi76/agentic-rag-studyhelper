@@ -74,11 +74,16 @@
 - **DoD:** ✅ verified — TestClient saw progress events + final lesson over
   text/event-stream; 400 and 422 both returned the structured envelope.
 
-## Phase 7 — Docker (NFR-4, NFR-5)
-- [ ] Multi-stage `Dockerfile` (port 7860 for HF Spaces).
-- [ ] `docker-compose` for LOCAL DEV using `pgvector/pgvector:pg16` (mirrors Neon).
-- [ ] Env-driven config; `.env.example`.
-- **DoD:** `docker-compose up` → working stack locally on the same vector backend as prod.
+## Phase 7 — Docker (NFR-4, NFR-5) ✅ (code+files done; `docker compose up` = user verify)
+- [x] Multi-stage `Dockerfile` at repo root (port 7860 for HF Spaces; pre-downloads the
+      fastembed model into the image); `.dockerignore` keeps secrets/data out.
+- [x] `docker-compose.yml` mirrors prod: app on `pgvector/pgvector:pg16`
+      (`VECTOR_BACKEND=pgvector`, Postgres for state+checkpoints+vectors), app exposed on host `8000`.
+- [x] Implemented the `pgvector` vector backend (`VECTOR_BACKEND` switch in
+      `vectorstore.py`) so local Docker uses the same backend as Neon; portable `$eq`
+      retrieval filter works on both Chroma and pgvector (verified).
+- **DoD:** `docker compose up --build` → working stack on pgvector (needs Docker; not
+  runnable in this dev sandbox — code + compose validated, user runs to confirm).
 
 ## Phase 8 — Observability (NFR-3)
 - [ ] **LangSmith** tracing on every node + LLM call (env: `LANGCHAIN_TRACING_V2`).

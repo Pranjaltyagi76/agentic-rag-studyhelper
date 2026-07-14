@@ -37,9 +37,10 @@ def RAG_Tool(query: str, filename: str | None, k: int, session_id: str):
     The Chroma ``where`` filter always constrains to ``session_id`` (multi-user
     isolation, NFR-1) and additionally to ``file_name`` when the planner selected one.
     """
-    conditions: list[dict] = [{"session_id": session_id}]
+    # Portable operators ($eq/$and) understood by both Chroma and PGVector.
+    conditions: list[dict] = [{"session_id": {"$eq": session_id}}]
     if filename:
-        conditions.append({"file_name": filename})
+        conditions.append({"file_name": {"$eq": filename}})
     where = conditions[0] if len(conditions) == 1 else {"$and": conditions}
 
     retriever = vectordb.as_retriever(search_kwargs={"k": k, "filter": where})

@@ -168,9 +168,9 @@ app/
   observability/
     tracing.py       # LangSmith/OTel setup
   config.py          # env-driven settings
-docker/
-  Dockerfile
-  docker-compose.yml
+Dockerfile           # at repo root (Hugging Face Spaces requires it there)
+docker-compose.yml   # local dev stack on pgvector (mirrors Neon)
+.dockerignore
 tests/
 ARCHITECTURE.md      # this file
 ```
