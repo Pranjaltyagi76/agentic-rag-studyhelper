@@ -59,11 +59,13 @@ def _seed(session_id: str, example: dict) -> None:
     ])
 
 
-def _retrieve(variant: str, session_id: str, example: dict) -> tuple[list[str], int, bool]:
-    """Return (chunk texts handed to the generator, retrieval attempts, degraded).
+def _retrieve(variant: str, session_id: str, example: dict) -> tuple[list[str], int, bool, bool]:
+    """Return (chunk texts handed to the generator, retrieval attempts, degraded, used_notes).
 
     `degraded=True` means the grader's LLM call never succeeded (rate limit/outage) so
     chunks were kept ungraded. Such rows are NOT valid quality measurements.
+    `used_notes` mirrors the pipeline's `use_rag`: the question was scoped to the user's
+    notes, so an empty result must trigger abstention rather than general knowledge.
     """
     if variant == "naive":
         docs = RAG_Tool(
@@ -72,7 +74,8 @@ def _retrieve(variant: str, session_id: str, example: dict) -> tuple[list[str], 
             k=NAIVE_K,
             session_id=session_id,
         )
-        return [d.page_content for d in docs], 1, False
+        # Naive RAG always retrieves from the notes; there is no use_rag decision.
+        return [d.page_content for d in docs], 1, False, True
 
     ctx = run_retrieval(
         session_id=session_id,
@@ -85,6 +88,7 @@ def _retrieve(variant: str, session_id: str, example: dict) -> tuple[list[str], 
         [d.page_content for d in (ctx.get("relevant_docs") or [])],
         ctx.get("attempts", 0),
         bool(ctx.get("grade_degraded")),
+        bool(ctx.get("use_rag")),
     )
 
 
@@ -97,8 +101,10 @@ def evaluate(variant: str, judge_answers: bool) -> dict:
         _seed(session_id, ex)
 
         t0 = time.perf_counter()
-        returned, attempts, degraded = _retrieve(variant, session_id, ex)
+        returned, attempts, degraded, used_notes = _retrieve(variant, session_id, ex)
         latency = time.perf_counter() - t0
+        # Same signal the teacher node computes: notes were asked for but none matched.
+        notes_missing = used_notes and not "\n\n".join(returned).strip()
 
         gold = relevant_texts(ex)
         row = {
@@ -115,13 +121,13 @@ def evaluate(variant: str, judge_answers: bool) -> dict:
         # Hallucination probe: unanswerable questions must NOT get an invented answer.
         if not ex["answerable"]:
             notes = "\n\n".join(returned)
-            answer = _generate_lesson(ex["question"], notes, "", "", "")
+            answer = _generate_lesson(ex["question"], notes, "", "", "", notes_missing)
             row["abstained"] = judges.abstained(ex["question"], answer)
 
         # Optional LLM quality judges (costs tokens; off by default).
         elif judge_answers:
             notes = "\n\n".join(returned)
-            answer = _generate_lesson(ex["question"], notes, "", "", "")
+            answer = _generate_lesson(ex["question"], notes, "", "", "", notes_missing)
             row["faithfulness"] = judges.faithfulness(answer, notes)
             row["answer_correctness"] = judges.answer_correctness(ex["question"], ex["reference"], answer)
 

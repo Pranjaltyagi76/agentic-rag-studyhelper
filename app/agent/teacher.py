@@ -118,8 +118,20 @@ Your objective is to make the user genuinely understand the topic.
 """
 
 
-def _generate_lesson(query: str, notes: str, web: str, feedback: str, history: str = "") -> str:
-    """One lesson draft. `feedback` (if any) steers a regeneration toward grounding."""
+def _generate_lesson(
+    query: str,
+    notes: str,
+    web: str,
+    feedback: str,
+    history: str = "",
+    notes_missing: bool = False,
+) -> str:
+    """One lesson draft. `feedback` (if any) steers a regeneration toward grounding.
+
+    `notes_missing` = the user scoped the question to their uploaded notes, but nothing
+    relevant was found. Without this guard the model silently answers from general
+    knowledge as if it came from their notes (caught by the eval's abstention probe).
+    """
     human = f"""
                  Conversation so far (for context; may be empty):
                  {history}
@@ -130,6 +142,19 @@ def _generate_lesson(query: str, notes: str, web: str, feedback: str, history: s
                  Web Research:
                  {web}
 """
+    if notes_missing:
+        human += (
+            "\n\nCRITICAL — SOURCE SCOPING: The user asked about their uploaded notes, but "
+            "NO relevant information was found in their notes for this question. You MUST "
+            "state plainly, up front, that their notes do not contain this. Never present "
+            "general knowledge as if it came from their notes.\n"
+            "- If Web Research is provided above, you may use it, but explicitly label it as "
+            "coming from outside their notes.\n"
+            "- If no Web Research is provided, do NOT answer the question from your own "
+            "knowledge and do NOT state the answer anyway. Tell them their notes don't cover "
+            "it, and suggest they upload notes that do, or ask again without limiting it to "
+            "their notes."
+        )
     if feedback:
         human += f"\n\nIMPORTANT — your previous draft had unsupported claims: {feedback}\nRewrite the lesson using ONLY the provided sources; drop or hedge anything not supported."
     return model.invoke([
@@ -158,12 +183,16 @@ def teacher_node(state: AgentState):
     sources = (notes + "\n" + web).strip()
     history = _history_text(state)
 
+    # The user scoped the question to their notes, but retrieval/grading found nothing
+    # relevant. Tell the generator to say so instead of substituting general knowledge.
+    notes_missing = bool(ctx.get("use_rag")) and not notes.strip()
+
     feedback = ""
     grounded: bool | None = None
     lesson = ""
 
     for attempt in range(1, settings.GENERATION_MAX_ATTEMPTS + 1):
-        lesson = _generate_lesson(state["query"], notes, web, feedback, history)
+        lesson = _generate_lesson(state["query"], notes, web, feedback, history, notes_missing)
 
         if not sources:
             # No retrieved/web context to verify against — general-knowledge answer.
