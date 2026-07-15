@@ -32,13 +32,23 @@ def build_checkpointer():
         cp.setup()
         _checkpointer = cp
     else:
-        # Postgres / Neon. Finalized (connection pooling) in Phase 9; this keeps a
-        # single long-lived saver alive for the process.
+        # Postgres / Neon (Phase 9). Use a long-lived connection pool: `from_conn_string`
+        # returns a context manager whose connection closes as soon as it exits, which
+        # would break every checkpoint read/write.
+        from psycopg.rows import dict_row
+        from psycopg_pool import ConnectionPool
         from langgraph.checkpoint.postgres import PostgresSaver
 
-        cp = PostgresSaver.from_conn_string(url)
-        if hasattr(cp, "__enter__"):  # some versions return a context manager
-            cp = cp.__enter__()
+        pool = ConnectionPool(
+            conninfo=url,
+            min_size=1,
+            max_size=5,
+            # PostgresSaver requires autocommit + dict rows. prepare_threshold=0 keeps
+            # us safe if the URL is ever pointed at a PgBouncer/pooled endpoint.
+            kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+            open=True,
+        )
+        cp = PostgresSaver(pool)
         cp.setup()
         _checkpointer = cp
 
