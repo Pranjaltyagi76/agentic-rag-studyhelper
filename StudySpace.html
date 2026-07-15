@@ -60,6 +60,11 @@ button:hover{background:#2563eb}
 </div>
 
 <script>
+// Deployed API (Render). To point this at a local server instead, run in the browser
+// console:  localStorage.setItem("api_base", "http://127.0.0.1:8000")
+// and to switch back:  localStorage.removeItem("api_base")
+const API_BASE = localStorage.getItem("api_base") || "https://agentic-rag-studyhelper.onrender.com";
+
 const selectedFiles=[];
 let agentstate = null;
 let currentQuestionIndex = 0;
@@ -109,7 +114,7 @@ async function uploadFiles(){
     formData.append("file", selectedFiles[0]);
     formData.append("session_id", getSessionId());
 
-    const response=await fetch("http://127.0.0.1:8000/upload",{
+    const response=await fetch(API_BASE+"/upload",{
         method:"POST",
         headers:authHeadersOnly(),
         body:formData
@@ -143,7 +148,7 @@ async function sendQuery(){
     };
 
     // Stream node-by-node progress via SSE (Phase 6).
-    const response=await fetch("http://127.0.0.1:8000/chat/stream",{
+    const response=await fetch(API_BASE+"/chat/stream",{
         method:"POST",
         headers:apiHeaders(),
         body:JSON.stringify({session_id:getSessionId(), query})
@@ -287,7 +292,7 @@ async function submitAnswer(){
         return;
     }
 
-    const response = await fetch("http://127.0.0.1:8000/evaluate",{
+    const response = await fetch(API_BASE+"/evaluate",{
 
         method:"POST",
 
