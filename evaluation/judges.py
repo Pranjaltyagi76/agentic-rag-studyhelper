@@ -15,6 +15,14 @@ class Judgement(BaseModel):
     reason: str = Field(description="One sentence justification.")
 
 
+class Abstention(BaseModel):
+    abstained: bool = Field(
+        description="True if the answer admits the information is not available / does not "
+        "answer it; False if it asserts a specific answer."
+    )
+    reason: str = Field(description="One sentence justification.")
+
+
 def _judge(system: str, human: str) -> int:
     result = structured_invoke(
         Judgement,
@@ -42,6 +50,29 @@ def faithfulness(answer: str, notes: str) -> int:
         "Ignore well-known common knowledge. Return only the Judgement schema.",
         f"NOTES:\n{notes or '(none)'}\n\nANSWER:\n{answer}",
     )
+
+
+def abstained(question: str, answer: str) -> bool:
+    """Hallucination probe: on an unanswerable question, did the system refuse to invent?
+
+    True  = said it doesn't know / not in the notes  (GOOD)
+    False = asserted a specific answer anyway        (HALLUCINATION)
+    """
+    result = structured_invoke(
+        Abstention,
+        [
+            SystemMessage(content=(
+                "The QUESTION cannot be answered from the user's notes. Decide whether the "
+                "ANSWER correctly abstained. abstained=true if it states the information is "
+                "not in the notes / it cannot answer confidently / it asks for the notes. "
+                "abstained=false if it asserts a specific factual answer to the question "
+                "(even hedged). Return only the Abstention schema."
+            )),
+            HumanMessage(content=f"QUESTION:\n{question}\n\nANSWER:\n{answer}"),
+        ],
+        default=Abstention(abstained=False, reason="judge call failed; counted as hallucination"),
+    )
+    return bool(result.abstained)
 
 
 def answer_correctness(question: str, reference: str, answer: str) -> int:
