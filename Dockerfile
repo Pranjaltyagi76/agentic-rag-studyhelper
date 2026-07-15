@@ -1,5 +1,6 @@
 # Multi-stage image for the Agentic RAG Study Helper.
-# Serves on port 7860 (Hugging Face Spaces convention). See deployment.md.
+# Binds to $PORT when the host sets one (Render, Cloud Run, ...), else 7860.
+# See deployment.md.
 
 # --- builder: install dependencies into an isolated prefix ---
 FROM python:3.13-slim AS builder
@@ -29,6 +30,7 @@ RUN python -c "from fastembed import TextEmbedding; TextEmbedding('sentence-tran
 EXPOSE 7860
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')" || exit 1
+    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.environ.get('PORT','7860'))" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Shell form so ${PORT} expands: hosts like Render inject their own port.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}"]

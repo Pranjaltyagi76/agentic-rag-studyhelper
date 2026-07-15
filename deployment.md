@@ -13,7 +13,7 @@
 
 | Layer | Service | Free? | Docker? | Trade-off accepted |
 |---|---|---|---|---|
-| **App** | **Hugging Face Spaces** (Docker SDK) | ✅ | ✅ builds our Dockerfile | Sleeps when idle; ~30–60s wake on first request |
+| **App** | **Render** (free web service, Docker) | ✅ no card | ✅ builds our Dockerfile | Spins down after 15 min idle (~1 min cold start); 750 hrs/mo |
 | **Postgres + vectors** | **Neon** (Postgres + `pgvector`) | ✅ non-expiring | ❌ managed | ~0.5 GB storage cap |
 | **Observability** | **LangSmith** | ✅ free tier | — | Trace quota limits |
 | **Evaluation** | **MLflow** (run locally) | ✅ | ✅ local | Not hosted; run on demand |
