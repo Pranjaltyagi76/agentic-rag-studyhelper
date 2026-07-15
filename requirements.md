@@ -106,10 +106,17 @@ observable, multi-user API.
 
 ## 6. Acceptance criteria (definition of done)
 
-- [ ] Two concurrent sessions cannot read each other's notes or state.
-- [ ] Killing and restarting the app resumes an in-flight session's memory.
-- [ ] Retrieval grading demonstrably drops irrelevant chunks (traced).
-- [ ] A deliberately ungrounded generation triggers regenerate/flag.
-- [ ] `docker-compose up` yields a working `/health`, `/upload`, `/chat`, `/evaluate`.
-- [ ] Every request produces a trace in LangSmith.
-- [ ] Deployed URL serves the same flow as local.
+- [x] Two concurrent sessions cannot read each other's notes or state. — **verified**:
+      session A could not see a codename that existed only in session B's notes; owner B could.
+- [x] Killing and restarting the app resumes an in-flight session's memory. — **verified**
+      across a real process restart (lesson + message history reloaded from the checkpoint).
+- [x] Retrieval grading demonstrably drops irrelevant chunks. — **verified**: grader kept
+      the photosynthesis chunks and dropped the Eiffel Tower distractor.
+- [~] A deliberately ungrounded generation triggers regenerate/flag. — mechanism verified
+      (check runs, `grounded` populated, regenerate/flag wired + capped). Forcing a truly
+      ungrounded generation on demand is non-deterministic; not yet observed live.
+- [ ] `docker compose up` yields a working `/health`, `/upload`, `/chat`, `/evaluate`.
+      — Docker not installed locally; Dockerfile + compose validated only (not run).
+- [x] Every request produces a trace in LangSmith. — **verified**: live traces in the
+      `studyhelper` project (planner → executor → ChatGroq node tree).
+- [ ] Deployed URL serves the same flow as local. — Phase 9 in progress (Render).

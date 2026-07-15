@@ -16,26 +16,26 @@
 - [x] requirements.md, design.md, roadmap.md, deployment.md, review.md, strategy.md
 - **DoD:** shared understanding of what/how/when before code changes.
 
-## Phase 1 — Behavior-preserving refactor ✅ (code complete; runtime boot pending deps+keys)
+## Phase 1 — Behavior-preserving refactor ✅
 - [x] Split `Agent.py` / `app.py` into the `app/` package (ARCHITECTURE §5).
 - [x] No logic change; endpoints unchanged (`/upload`, `/chat`, `/evaluate` + new `/health`).
 - [x] Resolve embedding issue (A2: removed dead Google embeddings; HF canonical) and dead HF model (A5: dropped).
-- [x] Added missing runtime deps to `requirements.txt` (A12).
-- **DoD:** same behavior, new structure. ⚠️ **Boot not yet verified** — this env lacks
-  installed deps + API keys. Verify with: `pip install -r requirements.txt` then
-  `uvicorn app.main:app --port 8000` and exercise the flow. Byte-compile + import
-  graph checks passed.
+- [x] Curated `requirements.txt` + `requirements.lock.txt` (A12); embeddings run on
+      fastembed/ONNX (torch-free, A13).
+- **DoD:** ✅ verified — `.venv` (Python 3.13) installs clean, app boots, all endpoints
+  route, and the flow was exercised end-to-end against live keys.
 
-## Phase 2 — Sessions & multi-user isolation (FR-6, NFR-1) ✅ (code complete; boot pending deps+keys)
+## Phase 2 — Sessions & multi-user isolation (FR-6, NFR-1) ✅
 - [x] Remove global `current_agent_state` / `uploaded_files` → per-`session_id` store (A1).
 - [x] Add `session_id` to all endpoints + `AgentState` + the frontend (localStorage).
 - [x] Relational `sessions` + `documents` tables via SQLAlchemy (SQLite local / Neon Postgres prod).
       (`messages` table deferred to Phase 5 with the checkpointer.)
 - [x] Vector filter includes `session_id` (fixed `RAG_Tool`, A3) + `session_id` in chunk metadata.
-- **DoD:** two concurrent sessions are isolated — different `session_id` → separate
-  uploads, separate retrieval, separate quiz state. ⚠️ Verify at runtime (user testing).
-- **Note:** transient agent state (quiz for `/evaluate`) is in-memory per session; it
-  is isolated but not yet durable across restart (durability = Phase 5).
+- **DoD:** ✅ **verified live** — two sessions seeded with different notes; session A asked
+  for a codename that only existed in session B's notes and could NOT see it ("retrieved
+  notes section is empty"), while owner B retrieved it fine. No cross-session leak.
+- **Note:** the in-memory per-session store was later retired in Phase 5 — transient state
+  (the quiz for `/evaluate`) is now durable in the checkpointer.
 
 ## Phase 3 — Self-corrective retrieval subgraph (FR-2.2, FR-2.3) ✅
 - [x] `plan_retrieval` → `retrieve` → `grade` → `plan_web` → `web_fetch` subgraph
@@ -85,15 +85,16 @@
 - **DoD:** `docker compose up --build` → working stack on pgvector (needs Docker; not
   runnable in this dev sandbox — code + compose validated, user runs to confirm).
 
-## Phase 8 — Observability (NFR-3) ✅ (wired; live LangSmith needs the user's key)
+## Phase 8 — Observability (NFR-3) ✅
 - [x] **LangSmith** tracing via `app/observability/tracing.py` — auto-enables when
       `LANGCHAIN_API_KEY` is set (no-op otherwise); `/chat` runs tagged (`run_name`,
       `tags`, `metadata`) for filterable traces.
 - [x] Retrieval-quality metrics (`app/observability/metrics.py`): grade pass rate +
       attempt from the grader, grounded + attempts from the teacher (structured logs).
 - [x] OpenTelemetry instruments the FastAPI layer; OTLP export if endpoint configured.
-- **DoD:** wiring verified (tracing correctly OFF without key, OTel instruments, metrics
-  emit, app serves). End-to-end LangSmith trace confirmed once the user adds their key.
+- **DoD:** ✅ **verified live** — key added and authenticated; real traces land in the
+  `studyhelper` project (node tree visible: planner → executor → ChatGroq → parsers).
+  Metrics emit (`pass_rate`, `grounded`); OTel instruments the app.
 
 ## Phase 8.5 — Evaluation (NFR-9, post-M2) ✅
 - [x] Curated eval set (`evaluation/dataset.py`) — note chunks + question + reference,
@@ -105,17 +106,24 @@
 - **DoD:** ✅ baseline run logged (3 examples, avg 5.0 across all metrics). Re-running
   with a changed knob/prompt under a new `--label` produces a comparable run in `mlflow ui`.
 
-## Phase 9 — Deployment (free tier: HF Spaces + Neon)
-- [ ] Provision **Neon** free Postgres; `CREATE EXTENSION vector;`.
-- [ ] Deploy app to **Hugging Face Spaces** (Docker SDK) from our Dockerfile.
-- [ ] Secrets set as HF Space secrets; healthcheck; migrations on boot.
-- [ ] `VECTOR_BACKEND=pgvector` in prod (Chroma stays local-dev only).
-- **DoD:** public HF Space URL runs the same flow as local; traces flow in prod; $0 spent.
+## Phase 9 — Deployment (free tier: **Render** + Neon) — in progress
+> Host changed from HF Spaces → Render: HF locked the Docker SDK behind a paid plan
+> (see strategy.md decision log). Neon is unchanged.
+- [x] Provision **Neon** free Postgres; `CREATE EXTENSION vector;` (pgvector 0.8.0).
+- [x] Pre-flight verified against live Neon: psycopg3, SQLAlchemy/psycopg2 (PG 17.10),
+      `init_db` tables, PGVector store, PostgresSaver checkpointer — all OK.
+- [x] Code pushed to a **private** GitHub repo (`Pranjaltyagi76/agentic-rag-studyhelper`);
+      secret scan across all commits: 0 hits.
+- [ ] Create the Render **free web service** from the repo (Docker runtime).
+- [ ] Set env vars: `DATABASE_URL` (Neon), `VECTOR_BACKEND=pgvector`, `APP_ENV=production`,
+      Groq/Google/Tavily/LangSmith keys.
+- [ ] Point the frontend at the deployed URL.
+- **DoD:** public Render URL runs the same flow as local; traces flow in prod; $0 spent.
 
 ---
 
 ## Milestones
-- **M1 — Solid foundation:** Phases 1–2 (structure + isolation).
+- **M1 — Solid foundation:** Phases 1–2 (structure + isolation). ✅ **DONE**
 - **M2 — Advanced RAG:** Phases 3–4 (the self-correcting loops = "advanced"). ✅ **DONE**
 - **M3 — Durable & observable:** Phases 5–6, 8, 8.5. ✅ **DONE**
 - **M4 — Shipped:** Phases 7, 9.
