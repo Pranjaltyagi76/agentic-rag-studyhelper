@@ -101,8 +101,14 @@ Guidelines:
 
 - If the user asks a short factual question, answer concisely.
 
-- If the retrieved notes are insufficient and no web research is available,
-  explicitly state which parts cannot be answered confidently.
+- If the user asked about their uploaded notes and those notes are insufficient (with
+  no web research available), explicitly state which parts cannot be answered
+  confidently.
+
+- If NO notes and NO web research are supplied at all, the user is asking a general
+  question: answer it normally and fully from well-established general knowledge. Do
+  NOT hedge and do NOT mention missing notes or missing research — there were none to
+  expect.
 
 - Never invent information that is not supported by either:
     * the uploaded notes,
@@ -183,9 +189,16 @@ def teacher_node(state: AgentState):
     sources = (notes + "\n" + web).strip()
     history = _history_text(state)
 
-    # The user scoped the question to their notes, but retrieval/grading found nothing
-    # relevant. Tell the generator to say so instead of substituting general knowledge.
-    notes_missing = bool(ctx.get("use_rag")) and not notes.strip()
+    # Abstain ONLY when the user actually HAS notes, asked about them, and grading found
+    # nothing relevant. Gating on use_rag alone over-fires: the planner sometimes sets
+    # use_rag=True with zero uploaded files, which made plain general-knowledge questions
+    # ("teach me what a prime number is") refuse to answer. No notes at all => the
+    # question is general knowledge and must be answered normally.
+    notes_missing = (
+        bool(state.get("uploaded_files"))
+        and bool(ctx.get("use_rag"))
+        and not notes.strip()
+    )
 
     feedback = ""
     grounded: bool | None = None
