@@ -10,10 +10,11 @@ on startup via the lifespan hook.
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -108,3 +109,15 @@ async def _unhandled_exc(request: Request, exc: Exception):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# Serve the frontend at "/" so the deployed URL IS the app (not a 404). Same origin as
+# the API, so the browser needs no CORS and the page can use relative paths.
+_FRONTEND = Path(__file__).resolve().parent.parent / "StudySpace.html"
+
+
+@app.get("/", include_in_schema=False)
+def index():
+    if _FRONTEND.exists():
+        return FileResponse(_FRONTEND)
+    return JSONResponse({"service": "Agentic RAG Study Helper", "docs": "/docs"})

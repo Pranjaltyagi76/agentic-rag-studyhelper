@@ -60,10 +60,13 @@ button:hover{background:#2563eb}
 </div>
 
 <script>
-// Deployed API (Render). To point this at a local server instead, run in the browser
-// console:  localStorage.setItem("api_base", "http://127.0.0.1:8000")
-// and to switch back:  localStorage.removeItem("api_base")
-const API_BASE = localStorage.getItem("api_base") || "https://agentic-rag-studyhelper.onrender.com";
+// Where to send API calls:
+//  - served by the app itself (http/https) -> same origin, use relative paths
+//  - opened straight off disk (file://)    -> fall back to the deployed API
+// Override anytime:  localStorage.setItem("api_base", "http://127.0.0.1:8000")
+//        and undo:   localStorage.removeItem("api_base")
+const API_BASE = localStorage.getItem("api_base")
+    ?? (location.protocol === "file:" ? "https://agentic-rag-studyhelper.onrender.com" : "");
 
 const selectedFiles=[];
 let agentstate = null;

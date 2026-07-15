@@ -18,6 +18,8 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 COPY app/ app/
+# The frontend is served at "/" by app.main, so it must be in the image.
+COPY StudySpace.html ./
 
 ENV PORT=7860 \
     HF_HUB_DISABLE_SYMLINKS_WARNING=1 \
