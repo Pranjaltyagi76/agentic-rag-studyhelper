@@ -41,3 +41,5 @@ side by side.
 - `dataset.py` — curated eval set (note chunks + question + reference answer).
 - `judges.py` — LLM-as-judge scorers (reuse the app's robust structured-output helper).
 - `run_eval.py` — harness: seed → retrieve → generate → judge → log to MLflow.
+- **[`metrics/README.md`](metrics/README.md) — measured results for the whole project**
+  (RAG scores, isolation, durability, API suite, observability, cost, and known gaps).
