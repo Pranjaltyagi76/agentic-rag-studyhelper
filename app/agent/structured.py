@@ -46,8 +46,12 @@ def _salvage(err: Exception, schema):
         return None
 
 
-def structured_invoke(schema, messages, *, default=None):
+def structured_invoke(schema, messages, *, default=None, on_fallback=None):
     """Invoke the model for a structured `schema`, with retries + salvage + default.
+
+    `on_fallback(error)` is called if we end up returning `default` — i.e. the model
+    never produced a usable result. Callers should use it to surface *degradation*
+    (rate limits, outages) rather than let a fallback masquerade as a real answer.
 
     Raises the last error only if salvage fails on every attempt and no `default`
     was supplied.
@@ -65,5 +69,7 @@ def structured_invoke(schema, messages, *, default=None):
                 return salvaged
 
     if default is not None:
+        if on_fallback is not None:
+            on_fallback(last_err)
         return default
     raise last_err

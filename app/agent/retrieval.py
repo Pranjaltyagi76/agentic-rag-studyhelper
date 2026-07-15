@@ -23,7 +23,7 @@ from langgraph.graph import StateGraph, START, END
 
 from app.config import settings
 from app.agent.structured import structured_invoke
-from app.observability.metrics import log_retrieval_grade
+from app.observability.metrics import log_retrieval_grade, log_grade_degraded
 from app.persistence.vectorstore import vectordb
 
 search = TavilySearch(max_results=settings.TAVILY_MAX_RESULTS)
@@ -110,6 +110,7 @@ class RetrievalState(TypedDict, total=False):
     relevant_docs: list
     sufficient: bool
     missing: str | None
+    grade_degraded: bool   # grader unavailable -> chunks kept ungraded (not a quality signal)
 
     # web
     use_web: bool
@@ -203,14 +204,17 @@ def _grade(state: RetrievalState) -> dict:
         return {"sufficient": False, "missing": "No documents were retrieved."}
 
     numbered = "\n\n".join(f"[{i}] {d.page_content}" for i, d in enumerate(raw))
+    degraded: dict = {"hit": False}
     grade = structured_invoke(
         DocsGrade,
         [
             SystemMessage(content=_GRADE_SYSTEM),
             HumanMessage(content=f"Query:\n{state['query']}\n\nChunks:\n{numbered}"),
         ],
-        # If grading fails, keep all retrieved chunks and treat them as sufficient.
+        # If grading fails, keep all retrieved chunks and treat them as sufficient —
+        # but record it, so a rate limit/outage is never mistaken for "graded well".
         default=DocsGrade(relevant_ids=list(range(len(raw))), sufficient=True),
+        on_fallback=lambda e: (degraded.__setitem__("hit", True), log_grade_degraded(e)),
     )
 
     picked = [raw[i] for i in grade.relevant_ids if 0 <= i < len(raw)]
@@ -230,6 +234,8 @@ def _grade(state: RetrievalState) -> dict:
         "notes_text": notes_text,
         "sufficient": bool(grade.sufficient and picked),
         "missing": grade.missing,
+        # True when the grader was unavailable and we kept everything ungraded.
+        "grade_degraded": bool(degraded["hit"]),
     }
 
 

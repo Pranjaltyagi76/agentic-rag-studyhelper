@@ -59,8 +59,12 @@ def _seed(session_id: str, example: dict) -> None:
     ])
 
 
-def _retrieve(variant: str, session_id: str, example: dict) -> tuple[list[str], int]:
-    """Return (chunk texts handed to the generator, retrieval attempts)."""
+def _retrieve(variant: str, session_id: str, example: dict) -> tuple[list[str], int, bool]:
+    """Return (chunk texts handed to the generator, retrieval attempts, degraded).
+
+    `degraded=True` means the grader's LLM call never succeeded (rate limit/outage) so
+    chunks were kept ungraded. Such rows are NOT valid quality measurements.
+    """
     if variant == "naive":
         docs = RAG_Tool(
             query=example["question"],          # raw question, no LLM rewrite
@@ -68,7 +72,7 @@ def _retrieve(variant: str, session_id: str, example: dict) -> tuple[list[str], 
             k=NAIVE_K,
             session_id=session_id,
         )
-        return [d.page_content for d in docs], 1
+        return [d.page_content for d in docs], 1, False
 
     ctx = run_retrieval(
         session_id=session_id,
@@ -77,7 +81,11 @@ def _retrieve(variant: str, session_id: str, example: dict) -> tuple[list[str], 
         purpose="teach",
         allow_web=False,                        # keep the comparison to the notes only
     )
-    return [d.page_content for d in (ctx.get("relevant_docs") or [])], ctx.get("attempts", 0)
+    return (
+        [d.page_content for d in (ctx.get("relevant_docs") or [])],
+        ctx.get("attempts", 0),
+        bool(ctx.get("grade_degraded")),
+    )
 
 
 def evaluate(variant: str, judge_answers: bool) -> dict:
@@ -89,7 +97,7 @@ def evaluate(variant: str, judge_answers: bool) -> dict:
         _seed(session_id, ex)
 
         t0 = time.perf_counter()
-        returned, attempts = _retrieve(variant, session_id, ex)
+        returned, attempts, degraded = _retrieve(variant, session_id, ex)
         latency = time.perf_counter() - t0
 
         gold = relevant_texts(ex)
@@ -101,6 +109,7 @@ def evaluate(variant: str, judge_answers: bool) -> dict:
             "retrieval_attempts": attempts,
             "retrieval_latency_s": round(latency, 2),
             "chunks_kept": len(returned),
+            "degraded": degraded,
         }
 
         # Hallucination probe: unanswerable questions must NOT get an invented answer.
@@ -119,18 +128,25 @@ def evaluate(variant: str, judge_answers: bool) -> dict:
         rows.append(row)
         print(f"  {ex['id']:<34} P={row['precision']:.2f} R={row['recall']:.2f} "
               f"F1={row['f1']:.2f} rej={row['distractor_rejection']:.2f}"
+              + (" [DEGRADED]" if degraded else "")
               + (f" abstained={row['abstained']}" if 'abstained' in row else ""))
 
-    answerable = [r for r in rows if r["id"] not in {e["id"] for e in EVAL_SET if not e["answerable"]}]
-    unanswerable = [r for r in rows if "abstained" in r]
+    unanswerable_ids = {e["id"] for e in EVAL_SET if not e["answerable"]}
+    # Degraded rows measure an outage, not retrieval quality — exclude them from the
+    # headline numbers and report the count instead of quietly skewing the average.
+    valid = [r for r in rows if not r["degraded"]]
+    answerable = [r for r in valid if r["id"] not in unanswerable_ids]
+    unanswerable = [r for r in valid if "abstained" in r]
 
     metrics = {
         "avg_precision": mean([r["precision"] for r in answerable]),
         "avg_recall": mean([r["recall"] for r in answerable]),
         "avg_f1": mean([r["f1"] for r in answerable]),
-        "avg_distractor_rejection": mean([r["distractor_rejection"] for r in rows]),
-        "avg_retrieval_latency_s": mean([r["retrieval_latency_s"] for r in rows]),
-        "avg_chunks_kept": mean([float(r["chunks_kept"]) for r in rows]),
+        "avg_distractor_rejection": mean([r["distractor_rejection"] for r in valid]),
+        "avg_retrieval_latency_s": mean([r["retrieval_latency_s"] for r in valid]),
+        "avg_chunks_kept": mean([float(r["chunks_kept"]) for r in valid]),
+        "degraded_examples": float(sum(1 for r in rows if r["degraded"])),
+        "valid_examples": float(len(valid)),
     }
     if unanswerable:
         metrics["hallucination_rate"] = mean([0.0 if r["abstained"] else 1.0 for r in unanswerable])
