@@ -80,6 +80,11 @@ Guidelines:
 
 - Do not mention that you used RAG or retrieved chunks.
 
+- Never narrate your sources or their absence. Do not open with things like "the
+  provided notes/web research do not contain...". Just teach the topic. (The ONLY
+  exception is when you are explicitly told below that the user asked about their
+  uploaded notes and no relevant notes were found — then you must say so.)
+
 - Explain concepts step by step.
 
 - Use simple language first, then gradually introduce technical depth.
@@ -138,16 +143,18 @@ def _generate_lesson(
     relevant was found. Without this guard the model silently answers from general
     knowledge as if it came from their notes (caught by the eval's abstention probe).
     """
-    human = f"""
-                 Conversation so far (for context; may be empty):
-                 {history}
-                 User Query:
-                 {query}
-                 Retrieved Notes:
-                 {notes}
-                 Web Research:
-                 {web}
-"""
+    # Only include sections that actually have content. Empty "Retrieved Notes:" /
+    # "Web Research:" headers make the model narrate their absence ("since we don't have
+    # any information in your notes...") even on plain general-knowledge questions.
+    parts = []
+    if history.strip():
+        parts.append(f"Conversation so far (for context):\n{history}")
+    parts.append(f"User Query:\n{query}")
+    if notes.strip():
+        parts.append(f"Retrieved Notes:\n{notes}")
+    if web.strip():
+        parts.append(f"Web Research:\n{web}")
+    human = "\n\n".join(parts)
     if notes_missing:
         human += (
             "\n\nCRITICAL — SOURCE SCOPING: The user asked about their uploaded notes, but "
@@ -204,11 +211,16 @@ def teacher_node(state: AgentState):
     grounded: bool | None = None
     lesson = ""
 
+    # Only verify grounding when we are actually teaching FROM the user's notes. On a
+    # general-knowledge answer there is nothing to be unfaithful to, and grading it
+    # against incidental web snippets produced false "unsupported" flags — and then a
+    # note about "your uploaded notes" for a user who has none.
+    verify_grounding = bool(notes.strip())
+
     for attempt in range(1, settings.GENERATION_MAX_ATTEMPTS + 1):
         lesson = _generate_lesson(state["query"], notes, web, feedback, history, notes_missing)
 
-        if not sources:
-            # No retrieved/web context to verify against — general-knowledge answer.
+        if not verify_grounding:
             grounded = None
             break
 

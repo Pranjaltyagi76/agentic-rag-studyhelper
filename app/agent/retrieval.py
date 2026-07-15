@@ -280,7 +280,9 @@ def _plan_web(state: RetrievalState) -> dict:
 
 def _web_fetch(state: RetrievalState) -> dict:
     results = research_tool(state.get("web_queries") or [])
-    return {"web_material": str(results)}
+    # str([]) is "[]" — a non-empty string that downstream treats as real material and
+    # then narrates as "the web research contains nothing". Empty means empty.
+    return {"web_material": str(results) if results else ""}
 
 
 # --------------------------------------------------------------------------- #
