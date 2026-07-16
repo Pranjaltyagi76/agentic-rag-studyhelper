@@ -54,6 +54,9 @@ class Settings:
 
     # --- Ingestion / OCR ---
     UPLOAD_FOLDER: str = os.getenv("UPLOAD_FOLDER", "uploads")
+    # Chunks embedded per batch at upload. Small on purpose: embedding a whole document
+    # at once peaks memory and OOM-kills small instances (Render free = 512 MB).
+    EMBED_BATCH_SIZE: int = int(os.getenv("EMBED_BATCH_SIZE", "8"))
     OCR_MODEL: str = os.getenv("OCR_MODEL", "gemini-2.5-flash")
     GOOGLE_API_KEY: str | None = os.getenv("GOOGLE_API_KEY")
 

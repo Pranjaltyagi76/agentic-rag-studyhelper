@@ -30,7 +30,13 @@ async def upload(
         f.write(await file.read())
 
     chunks = ingest(file_path, file.filename, session_id)
-    vectordb.add_documents(chunks)
+
+    # Embed in batches. Passing every chunk at once made fastembed hold all the
+    # embeddings in memory simultaneously, which OOM-killed the worker on a small
+    # (512 MB) instance: a 20-page PDF -> ~55 chunks -> 502. Batching keeps peak
+    # memory flat regardless of document size.
+    for i in range(0, len(chunks), settings.EMBED_BATCH_SIZE):
+        vectordb.add_documents(chunks[i : i + settings.EMBED_BATCH_SIZE])
 
     add_document(db, session_id, file.filename, len(chunks))
 

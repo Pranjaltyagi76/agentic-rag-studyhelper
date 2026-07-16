@@ -124,7 +124,12 @@ async function uploadFiles(){
     });
 
     if(!response.ok){
-        alert("Upload failed.");
+        let why = "";
+        try{ const e = await response.json(); why = (e.error && e.error.message) || e.detail || ""; }catch(_){}
+        if(response.status === 502 || response.status === 503){
+            why = "the server ran out of memory or restarted. Try a smaller PDF.";
+        }
+        alert("Upload failed (" + response.status + ")" + (why ? ": " + why : "."));
         return;
     }
 
