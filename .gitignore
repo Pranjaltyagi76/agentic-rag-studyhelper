@@ -26,3 +26,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/settings.json
+
+# Pinned fastembed model cache (container uses /app/.fastembed)
+.fastembed*/

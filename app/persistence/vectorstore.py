@@ -16,7 +16,12 @@ from langchain_community.embeddings import FastEmbedEmbeddings
 
 from app.config import settings
 
-embeddings = FastEmbedEmbeddings(model_name=settings.EMBEDDING_MODEL)
+_embed_kwargs = {"model_name": settings.EMBEDDING_MODEL}
+if settings.EMBED_CACHE_DIR:
+    # Use the model baked into the image rather than re-downloading it at runtime.
+    _embed_kwargs["cache_dir"] = settings.EMBED_CACHE_DIR
+
+embeddings = FastEmbedEmbeddings(**_embed_kwargs)
 
 
 def _build_vectorstore():

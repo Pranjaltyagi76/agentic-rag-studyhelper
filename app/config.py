@@ -35,6 +35,11 @@ class Settings:
     EMBEDDING_MODEL: str = os.getenv(
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )
+    # Where fastembed keeps the ONNX model. Unset locally (its default is fine). In the
+    # container this MUST be set to a non-/tmp path: the image bakes the model in at
+    # build time, but platforms mount a fresh tmpfs over /tmp at runtime, which hides it
+    # and forces an ~83 MB re-download on the first request.
+    EMBED_CACHE_DIR: str | None = os.getenv("EMBED_CACHE_DIR") or None
 
     # --- Vector store ---
     # pgvector is the canonical deploy backend (Phase 9); Chroma is local-dev only.

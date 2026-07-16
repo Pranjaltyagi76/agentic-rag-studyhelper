@@ -23,11 +23,15 @@ COPY StudySpace.html ./
 
 ENV PORT=7860 \
     HF_HUB_DISABLE_SYMLINKS_WARNING=1 \
-    VECTOR_BACKEND=pgvector
+    VECTOR_BACKEND=pgvector \
+    EMBED_CACHE_DIR=/app/.fastembed
 
-# Pre-download the fastembed ONNX model into the image so the first request is fast
-# and startup does not depend on model-host availability.
-RUN python -c "from fastembed import TextEmbedding; TextEmbedding('sentence-transformers/all-MiniLM-L6-v2')"
+# Bake the fastembed ONNX model into the image so the first request is fast and startup
+# doesn't depend on the model host. It MUST go to EMBED_CACHE_DIR, not fastembed's
+# default (/tmp/fastembed_cache): platforms mount a fresh tmpfs over /tmp at runtime,
+# which would hide the baked model and trigger an ~83 MB re-download on first use.
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding('sentence-transformers/all-MiniLM-L6-v2', cache_dir='/app/.fastembed')" \
+    && test -d /app/.fastembed
 
 EXPOSE 7860
 
