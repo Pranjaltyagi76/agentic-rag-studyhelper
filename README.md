@@ -438,3 +438,25 @@ Flashcard generation · study planner · multi-document reasoning · per-user au
 ⭐ *If this was useful, a star helps.*
 
 </div>
+---
+
+## 👤 Author
+
+**Pranjal Tyagi**
+
+📧 [pranjaltyagi200275@gmail.com](mailto:pranjaltyagi200275@gmail.com)
+💻 [github.com/Pranjaltyagi76](https://github.com/Pranjaltyagi76)
+
+Open to feedback, questions, and opportunities — feel free to reach out.
+
+---
+
+<div align="center">
+
+**[▶ Try the live app](https://agentic-rag-studyhelper.onrender.com)** · **[📊 See the metrics](evaluation/metrics/README.md)** · **[🏗️ Read the architecture](ARCHITECTURE.md)**
+
+<sub>Built with LangGraph · FastAPI · Groq · Neon · Render — running on <b>$0</b> of infrastructure.</sub>
+
+⭐ *If this was useful, a star helps.*
+
+</div>
