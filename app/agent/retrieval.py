@@ -165,9 +165,13 @@ Rules:
 1. If the user explicitly refers to their notes ("from my notes", "the pdf",
    "the slides", "according to my notes"), use_rag MUST be True.
 2. If the uploaded files list is empty, use_rag MUST be False.
-3. If the question is fully answerable from general knowledge and notes are not
-   requested, use_rag may be False.
-4. If use_rag is True:
+3. If the user names NO topic at all (e.g. just "generate quiz", "quiz me",
+   "teach me") and they HAVE uploaded files, they mean their uploaded material:
+   use_rag MUST be True, and the rag_query must broadly cover the main concepts
+   of the most relevant file.
+4. If the user names a specific topic answerable from general knowledge and does
+   not request their notes, use_rag may be False.
+5. If use_rag is True:
    - Pick the single most relevant filename from the uploaded files.
    - Write a focused semantic rag_query for the concepts to retrieve. For a quiz,
      base it ONLY on the quiz topic; ignore teaching/summarizing instructions.
