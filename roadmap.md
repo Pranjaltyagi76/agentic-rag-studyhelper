@@ -106,19 +106,24 @@
 - **DoD:** ✅ baseline run logged (3 examples, avg 5.0 across all metrics). Re-running
   with a changed knob/prompt under a new `--label` produces a comparable run in `mlflow ui`.
 
-## Phase 9 — Deployment (free tier: **Render** + Neon) — in progress
+## Phase 9 — Deployment (free tier: **Render** + Neon) ✅ **LIVE**
 > Host changed from HF Spaces → Render: HF locked the Docker SDK behind a paid plan
 > (see strategy.md decision log). Neon is unchanged.
 - [x] Provision **Neon** free Postgres; `CREATE EXTENSION vector;` (pgvector 0.8.0).
 - [x] Pre-flight verified against live Neon: psycopg3, SQLAlchemy/psycopg2 (PG 17.10),
       `init_db` tables, PGVector store, PostgresSaver checkpointer — all OK.
-- [x] Code pushed to a **private** GitHub repo (`Pranjaltyagi76/agentic-rag-studyhelper`);
+- [x] Code pushed to a GitHub repo (`Pranjaltyagi76/agentic-rag-studyhelper`, now public);
       secret scan across all commits: 0 hits.
-- [ ] Create the Render **free web service** from the repo (Docker runtime).
-- [ ] Set env vars: `DATABASE_URL` (Neon), `VECTOR_BACKEND=pgvector`, `APP_ENV=production`,
+- [x] Render **free web service** (Docker runtime), Virginia region — same as Neon.
+- [x] Env vars set: `DATABASE_URL` (Neon), `VECTOR_BACKEND=pgvector`, `APP_ENV=production`,
       Groq/Google/Tavily/LangSmith keys.
-- [ ] Point the frontend at the deployed URL.
-- **DoD:** public Render URL runs the same flow as local; traces flow in prod; $0 spent.
+- [x] Frontend served at `/` by the app itself, so the deployed URL **is** the app
+      (previously a 404 — a visitor had no way to use it).
+- **DoD:** ✅ **LIVE — https://agentic-rag-studyhelper.onrender.com**
+  Verified in production: `/` → 200 text/html serving the app; `/health` → 200;
+  live `/chat` teaches correctly (the general-knowledge regression is gone);
+  traces flow to LangSmith; **$0 spent**.
+- **Known trade-off:** free tier spins down after 15 min idle → ~50s cold start.
 
 ---
 
@@ -126,7 +131,8 @@
 - **M1 — Solid foundation:** Phases 1–2 (structure + isolation). ✅ **DONE**
 - **M2 — Advanced RAG:** Phases 3–4 (the self-correcting loops = "advanced"). ✅ **DONE**
 - **M3 — Durable & observable:** Phases 5–6, 8, 8.5. ✅ **DONE**
-- **M4 — Shipped:** Phases 7, 9.
+- **M4 — Shipped:** Phases 7, 9. ✅ **DONE** — live at
+  https://agentic-rag-studyhelper.onrender.com
 
 ## Risks (see review.md for the live log)
 - Embedding mismatch corrupts retrieval → address in Phase 1.
