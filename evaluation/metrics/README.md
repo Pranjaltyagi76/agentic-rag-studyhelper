@@ -163,6 +163,8 @@ PGVector store ✅ · PostgresSaver checkpointer ✅ *(bug found & fixed here �
 | Item | Impact |
 |---|---|
 | **Ablation benchmark** | Turned "we built loops" into **+153% precision, 4%→100% distractor rejection**, and surfaced a defect no other test caught |
+| **Token cost cut 55% (23k → 10.5k / request)** | Profiling a real 17-page textbook showed one request cost ~23k tokens (a fifth of the free daily budget). Capping retrieval `k` (30 → 15) and truncating chunks fed to the grader (full → first 320 chars) halved it — **verified by re-running the ablation to prove precision/recall/distractor-rejection held at 1.000.** |
+| **Rejected a cost optimization that failed the eval** | Routing grading to a cheap 8B model (separate quota bucket) looked like the biggest win — but the ablation showed it too lenient on unanswerable questions, sending hallucination_rate **0.00 → 1.00**. Kept the mechanism tunable; kept the *default* on the capable model. **Cost never at the core metric's expense.** |
 | **fastembed (ONNX) over sentence-transformers (PyTorch)** | Same model, **~15 MB vs ~2.5 GB** — made a free-tier deploy viable and broke a dependency deadlock |
 | **A16: structured-output salvage** | Groq `tool_use_failed` on apostrophes ("Newton's") → 500s. Now retried + **salvaged from the rejected generation**. Unit repro + live verification |
 | **Checkpointer connection pool** | Pre-flight caught `from_conn_string().__enter__()` closing the connection — would have **silently killed memory in production** |

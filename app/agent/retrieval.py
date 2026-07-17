@@ -22,6 +22,7 @@ from langchain_tavily import TavilySearch
 from langgraph.graph import StateGraph, START, END
 
 from app.config import settings
+from app.agent.llm import grader_model
 from app.agent.structured import structured_invoke
 from app.observability.metrics import log_retrieval_grade, log_grade_degraded
 from app.persistence.vectorstore import vectordb
@@ -175,8 +176,8 @@ Rules:
    - Pick the single most relevant filename from the uploaded files.
    - Write a focused semantic rag_query for the concepts to retrieve. For a quiz,
      base it ONLY on the quiz topic; ignore teaching/summarizing instructions.
-   - Choose number_chunks by scope: small question 5, single concept 10,
-     whole topic 20, whole chapter 30.
+   - Choose number_chunks by scope: small question 5, single concept 8,
+     whole topic 12, whole chapter {settings.RETRIEVAL_K_CAP} (the maximum).
 
 Do NOT answer or teach. Return ONLY the RetrievalPlan schema."""
     plan = structured_invoke(
@@ -184,11 +185,13 @@ Do NOT answer or teach. Return ONLY the RetrievalPlan schema."""
         [SystemMessage(content=system), HumanMessage(content=state["query"])],
         default=RetrievalPlan(use_rag=False),  # safe: fall back to general knowledge / web
     )
+    # Hard cap regardless of what the planner asked for — bounds token cost per request.
+    k = min(plan.number_chunks or 10, settings.RETRIEVAL_K_CAP)
     return {
         "use_rag": bool(plan.use_rag),
         "filename": plan.filename,
         "rag_query": plan.rag_query or state["query"],
-        "k": plan.number_chunks or 10,
+        "k": k,
     }
 
 
@@ -207,7 +210,10 @@ def _grade(state: RetrievalState) -> dict:
     if not raw:
         return {"sufficient": False, "missing": "No documents were retrieved."}
 
-    numbered = "\n\n".join(f"[{i}] {d.page_content}" for i, d in enumerate(raw))
+    # Grading only needs enough of each chunk to judge relevance — feed the opening,
+    # not the whole thing (~70% fewer tokens). Full chunks still reach the generator.
+    cap = settings.GRADE_CHUNK_CHARS
+    numbered = "\n\n".join(f"[{i}] {d.page_content[:cap]}" for i, d in enumerate(raw))
     degraded: dict = {"hit": False}
     grade = structured_invoke(
         DocsGrade,
@@ -215,6 +221,9 @@ def _grade(state: RetrievalState) -> dict:
             SystemMessage(content=_GRADE_SYSTEM),
             HumanMessage(content=f"Query:\n{state['query']}\n\nChunks:\n{numbered}"),
         ],
+        # Grading is classification, not reasoning — use the cheap model (cascading),
+        # which also draws from a separate quota bucket.
+        llm=grader_model,
         # If grading fails, keep all retrieved chunks and treat them as sufficient —
         # but record it, so a rate limit/outage is never mistaken for "graded well".
         default=DocsGrade(relevant_ids=list(range(len(raw))), sufficient=True),

@@ -46,8 +46,11 @@ def _salvage(err: Exception, schema):
         return None
 
 
-def structured_invoke(schema, messages, *, default=None, on_fallback=None):
-    """Invoke the model for a structured `schema`, with retries + salvage + default.
+def structured_invoke(schema, messages, *, default=None, on_fallback=None, llm=None):
+    """Invoke an LLM for a structured `schema`, with retries + salvage + default.
+
+    `llm` overrides the default reasoning model — pass the cheap grader model for
+    classification-only steps (model cascading).
 
     `on_fallback(error)` is called if we end up returning `default` — i.e. the model
     never produced a usable result. Callers should use it to surface *degradation*
@@ -56,7 +59,7 @@ def structured_invoke(schema, messages, *, default=None, on_fallback=None):
     Raises the last error only if salvage fails on every attempt and no `default`
     was supplied.
     """
-    runnable = model.with_structured_output(schema)
+    runnable = (llm or model).with_structured_output(schema)
     last_err: Exception | None = None
 
     for _ in range(settings.STRUCTURED_MAX_RETRIES + 1):

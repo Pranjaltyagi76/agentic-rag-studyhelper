@@ -30,6 +30,13 @@ class Settings:
 
     # --- LLM (reasoning) ---
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    # Model for the chunk-grading step. Tunable for model cascading, but defaults to the
+    # reasoning model on purpose: the ablation showed llama-3.1-8b-instant too lenient —
+    # it kept irrelevant chunks on unanswerable questions, which broke abstention and
+    # sent hallucination_rate 0.00 -> 1.00. Cost must not come at the core metric's
+    # expense, so grading stays on the capable model. (The token win below comes from
+    # truncation + the k-cap, not from a cheaper grader.)
+    GRADER_MODEL: str = os.getenv("GRADER_MODEL", GROQ_MODEL)
 
     # --- Embeddings (canonical: HF all-MiniLM-L6-v2, both ingest + query; decision 2026-07-14) ---
     EMBEDDING_MODEL: str = os.getenv(
@@ -72,6 +79,14 @@ class Settings:
     # Max retrieve->grade->rewrite loops before giving up and falling back to web /
     # general knowledge. Guarantees termination (design.md section 3).
     RETRIEVAL_MAX_ATTEMPTS: int = int(os.getenv("RETRIEVAL_MAX_ATTEMPTS", "2"))
+    # Hard cap on chunks retrieved per attempt. The planner's own guidance can request
+    # up to 30 ("whole chapter"), which on a real textbook makes one request cost ~20k
+    # tokens (a fifth of the free daily budget). Capping ~halves cost.
+    RETRIEVAL_K_CAP: int = int(os.getenv("RETRIEVAL_K_CAP", "15"))
+    # Only the first N chars of each chunk go into the GRADE prompt — enough to judge
+    # relevance, ~70% fewer tokens than the full chunk. Full chunks still reach the
+    # generator; this trims only the grader's input.
+    GRADE_CHUNK_CHARS: int = int(os.getenv("GRADE_CHUNK_CHARS", "320"))
 
     # --- Generate + verify loop / adaptive planner (Phase 4) ---
     # Max teacher (generate -> groundedness check -> regenerate) attempts.
