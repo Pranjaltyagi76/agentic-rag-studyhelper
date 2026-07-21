@@ -25,6 +25,9 @@
 ![LangSmith](https://img.shields.io/badge/LangSmith-traced-FF6F61?style=flat-square)
 ![MLflow](https://img.shields.io/badge/MLflow-evaluated-0194E2?style=flat-square&logo=mlflow&logoColor=white)
 ![Cost](https://img.shields.io/badge/infra_cost-%240-success?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+
+[![Tests](https://github.com/Pranjaltyagi76/agentic-rag-studyhelper/actions/workflows/tests.yml/badge.svg)](https://github.com/Pranjaltyagi76/agentic-rag-studyhelper/actions/workflows/tests.yml)
 
 </div>
 
@@ -47,6 +50,7 @@
 - [Tests](#-tests)
 - [Engineering notes](#️-engineering-notes)
 - [Limitations](#️-honest-limitations)
+- [License](#-license)
 
 ---
 
@@ -339,6 +343,7 @@ Everything is env-driven ([`.env.example`](.env.example) has them all). The inte
 | `GENERATION_MAX_ATTEMPTS` | `2` | Cap on the generate → verify → regenerate loop |
 | `REPLAN_MAX` | `3` | Cap on adaptive re-planning |
 | `EMBED_BATCH_SIZE` | `8` | Chunks embedded per batch (keeps peak memory flat) |
+| `MAX_UPLOAD_MB` | `20` | Max upload size; larger PDFs are rejected with `413` |
 | `CORS_ALLOW_ORIGINS` | `*` | Lock to your frontend origin in prod |
 | `APP_API_KEY` | *unset* | When set, every endpoint (except `/health`) requires it |
 
@@ -411,7 +416,7 @@ Things worth knowing about how this was actually built:
 - **The eval is 6 curated cases.** Built to isolate failure modes, not a large-scale benchmark.
 - **No per-user auth.** Sessions are unguessable tokens; an optional `APP_API_KEY` gates the API. Real accounts are future work.
 - **Self-correction costs tokens.** Several LLM calls per request (bounded by the caps). Groq's free tier is 100k/day — reachable under heavy testing.
-- **The regenerate-on-ungrounded path is wired and capped but rarely observed firing** — hard to force deterministically.
+- **The regenerate-on-ungrounded path rarely fires in production** — it only triggers on a genuinely ungrounded draft. It's exercised deterministically in the test suite, but you'll seldom see it live.
 
 ---
 
@@ -439,7 +444,13 @@ evaluation/             # ablation harness, judges, dataset, metrics write-up
 
 ## 🎯 Future work
 
-Flashcard generation · study planner · multi-document reasoning · per-user auth · larger eval set · friendlier rate-limit handling
+Flashcard generation · study planner · multi-document reasoning · per-user auth · larger eval set
+
+---
+
+## 📄 License
+
+Released under the **[MIT License](LICENSE)** — free to use, modify, and share, as long as the copyright notice is kept. © 2026 Pranjal Tyagi.
 
 ---
 
@@ -450,6 +461,7 @@ Flashcard generation · study planner · multi-document reasoning · per-user au
 ⭐ *If this was useful, a star helps.*
 
 </div>
+
 ---
 
 ## 👤 Author
