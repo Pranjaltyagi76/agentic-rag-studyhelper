@@ -66,6 +66,10 @@ class Settings:
 
     # --- Ingestion / OCR ---
     UPLOAD_FOLDER: str = os.getenv("UPLOAD_FOLDER", "uploads")
+    # Max accepted upload size (MB). The file is streamed to disk in chunks and rejected
+    # once it crosses this, so a large or malicious upload can't exhaust memory on a
+    # small (512 MB) instance before ingestion even starts.
+    MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "20"))
     # Chunks embedded per batch at upload. Small on purpose: embedding a whole document
     # at once peaks memory and OOM-kills small instances (Render free = 512 MB).
     EMBED_BATCH_SIZE: int = int(os.getenv("EMBED_BATCH_SIZE", "8"))

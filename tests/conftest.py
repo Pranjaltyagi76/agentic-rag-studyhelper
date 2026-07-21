@@ -32,6 +32,7 @@ os.environ.setdefault("DATABASE_URL", f"sqlite:///{_fwd}/app.db")
 os.environ.setdefault("CHECKPOINT_DB", f"{_fwd}/checkpoints.sqlite")
 os.environ.setdefault("CHROMA_DIR", f"{_fwd}/chroma")
 os.environ.setdefault("CHROMA_COLLECTION", "test")
+os.environ.setdefault("UPLOAD_FOLDER", f"{_fwd}/uploads")  # keep test uploads out of ./uploads
 os.environ.setdefault("LANGCHAIN_API_KEY", "")  # keep tracing off during tests
 
 # --- Dummy keys so provider clients construct offline (never actually called) ---
