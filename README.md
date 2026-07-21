@@ -44,6 +44,7 @@
 - [Configuration](#️-configuration)
 - [API reference](#-api-reference)
 - [Evaluation](#-evaluation)
+- [Tests](#-tests)
 - [Engineering notes](#️-engineering-notes)
 - [Limitations](#️-honest-limitations)
 
@@ -374,6 +375,19 @@ mlflow ui --backend-store-uri sqlite:///mlflow.db   # compare at :5000
 A **6-case adversarial set** — distractors, a **near-miss**, a **multi-hop** case, and two **unanswerable** hallucination probes — with every chunk labelled relevant/irrelevant, so precision and recall come from ground truth rather than a judge's opinion.
 
 📄 **[Full results & methodology →](evaluation/metrics/README.md)**
+
+---
+
+## ✅ Tests
+
+A hermetic smoke suite (`tests/`) that needs **no API keys** — it never calls Groq/Google/Tavily, so it runs in well under a second and in CI:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Covers the health/index routes and structured error envelopes, the CORS/production config helpers, the graph's executor routing, the structured-output salvage/fallback path, and — the security-critical part — that retrieval is **always scoped to the caller's `session_id`** (both the vector filter and the relational file list). Runs automatically on every push/PR via [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 
 ---
 

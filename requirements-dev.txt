@@ -1,0 +1,9 @@
+# Dev / test dependencies (not needed to run the app in production).
+#
+# The suite in tests/ is hermetic: it does NOT call Groq / Google / Tavily, so no real
+# API keys are required. Run it with:  pytest
+#
+# Install alongside the app deps:  pip install -r requirements.txt -r requirements-dev.txt
+
+pytest
+httpx   # transport used by FastAPI's TestClient (pinned here for CI clarity)
