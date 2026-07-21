@@ -127,12 +127,53 @@
 
 ---
 
+## Phase 10 — Post-launch hardening (2026-07) ✅
+> Reliability, security, and coverage work after the M4 launch. All of it is locked in by
+> a hermetic pytest suite (40 tests, **no API keys** — the LLM is mocked where needed)
+> that runs in ~1s and in GitHub Actions CI. The deployed service's runtime behavior is
+> unchanged.
+
+### Quality & CI
+- [x] Hermetic pytest suite + `.github/workflows/tests.yml`: HTTP surface (health/index,
+      structured error envelopes, API-key gate), config helpers, executor routing, the
+      structured-output salvage/fallback path, and — security-critical — that retrieval is
+      **always scoped to the caller's `session_id`** (vector filter + relational file list).
+- [x] Test depth: **real-PDF ingestion** (actual PyPDFLoader → session-tagged chunks, unit
+      + via `/upload`), a **full end-to-end teach turn** through the compiled graph with a
+      mocked LLM (planner routing → teacher → checkpoint persistence), and the
+      **generate→verify→regenerate** groundedness loop forced deterministically.
+
+### Security & robustness
+- [x] **Upload validation** — PDF-only, `MAX_UPLOAD_MB` cap enforced while streaming to
+      disk in chunks, path-safe `session_id` + basename filename. Protects the 512 MB
+      instance from OOM and the uploads folder from traversal.
+- [x] **Groq 429 backoff** (`invoke_with_backoff`) — honors the server's `Retry-After`,
+      else capped exponential backoff + jitter; logged, bounded, and applied to every Groq
+      call path. Replaces the SDK's opaque internal retry.
+- [x] **Checkpoint msgpack forward-compat** — registered the AgentState models
+      (PlannerState, task, Quiz, QuizQuestion, QuizEval) with the serializer so `/evaluate`
+      and conversational memory keep resuming once LangGraph enforces strict msgpack.
+
+### Schema & repo hygiene
+- [x] **Alembic migrations** for the `sessions`/`documents` schema (scoped away from the
+      checkpoint/pgvector tables sharing the DB) + a CI **drift guard** that fails if the
+      models diverge from the migrations. `create_all` stays as the zero-setup bootstrap;
+      existing DBs adopt the baseline via `alembic stamp head`.
+- [x] **Vendored marked.js inline** (dropped the cdnjs dependency) so markdown rendering
+      never fails on a blocked/offline CDN; **untracked the SQLite WAL sidecars**
+      (`-wal`/`-shm`) that had leaked into git.
+- **DoD:** ✅ suite green (40 passing) locally and in CI; no runtime-behavior change to the
+  live service; each item verified by its own test.
+
+---
+
 ## Milestones
 - **M1 — Solid foundation:** Phases 1–2 (structure + isolation). ✅ **DONE**
 - **M2 — Advanced RAG:** Phases 3–4 (the self-correcting loops = "advanced"). ✅ **DONE**
 - **M3 — Durable & observable:** Phases 5–6, 8, 8.5. ✅ **DONE**
 - **M4 — Shipped:** Phases 7, 9. ✅ **DONE** — live at
   https://agentic-rag-studyhelper.onrender.com
+- **M5 — Hardened:** Phase 10 (security, reliability, tests + CI). ✅ **DONE**
 
 ## Risks (see review.md for the live log)
 - Embedding mismatch corrupts retrieval → address in Phase 1.
