@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.config import settings
-from app.agent.llm import model
+from app.agent.llm import model, invoke_with_backoff
 from app.agent.structured import structured_invoke
 from app.agent.retrieval import run_retrieval
 from app.agent.state import AgentState
@@ -170,7 +170,7 @@ def _generate_lesson(
         )
     if feedback:
         human += f"\n\nIMPORTANT — your previous draft had unsupported claims: {feedback}\nRewrite the lesson using ONLY the provided sources; drop or hedge anything not supported."
-    return model.invoke([
+    return invoke_with_backoff(model, [
         SystemMessage(content=teacher_system),
         HumanMessage(content=human),
     ]).content

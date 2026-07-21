@@ -102,6 +102,14 @@ class Settings:
     # Retries for structured LLM calls before salvaging / defaulting.
     STRUCTURED_MAX_RETRIES: int = int(os.getenv("STRUCTURED_MAX_RETRIES", "2"))
 
+    # --- Groq rate-limit (429) backoff ---
+    # We disable the Groq SDK's opaque internal retry and own one explicit, logged
+    # backoff layer (app/agent/llm.py:invoke_with_backoff). On a 429 it waits the
+    # server's Retry-After when given, else capped exponential backoff with jitter.
+    RATE_LIMIT_MAX_RETRIES: int = int(os.getenv("RATE_LIMIT_MAX_RETRIES", "5"))
+    RATE_LIMIT_BASE_DELAY: float = float(os.getenv("RATE_LIMIT_BASE_DELAY", "1.0"))
+    RATE_LIMIT_MAX_DELAY: float = float(os.getenv("RATE_LIMIT_MAX_DELAY", "30.0"))
+
     # --- Observability (Phase 8) ---
     # LangSmith tracing turns on automatically once LANGCHAIN_API_KEY is set; empty = off.
     LANGCHAIN_API_KEY: str | None = os.getenv("LANGCHAIN_API_KEY") or None

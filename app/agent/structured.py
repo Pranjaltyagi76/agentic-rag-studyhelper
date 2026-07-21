@@ -15,7 +15,7 @@ import json
 import re
 
 from app.config import settings
-from app.agent.llm import model
+from app.agent.llm import model, invoke_with_backoff, _is_rate_limit
 
 
 def _failed_generation(err: Exception) -> str | None:
@@ -64,9 +64,15 @@ def structured_invoke(schema, messages, *, default=None, on_fallback=None, llm=N
 
     for _ in range(settings.STRUCTURED_MAX_RETRIES + 1):
         try:
-            return runnable.invoke(messages)
+            # invoke_with_backoff absorbs 429/5xx with delays; other errors bubble up here.
+            return invoke_with_backoff(runnable, messages)
         except Exception as e:  # noqa: BLE001 — we deliberately handle any LLM/tool error
             last_err = e
+            # A rate limit already exhausted its backoff inside invoke_with_backoff —
+            # retrying the salvage loop would only hammer the throttled endpoint. Stop
+            # and fall through to the caller's default (or re-raise).
+            if _is_rate_limit(e):
+                break
             salvaged = _salvage(e, schema)
             if salvaged is not None:
                 return salvaged
