@@ -40,6 +40,37 @@ os.environ.setdefault("GROQ_API_KEY", "test-key-not-used")
 os.environ.setdefault("GOOGLE_API_KEY", "test-key-not-used")
 os.environ.setdefault("TAVILY_API_KEY", "test-key-not-used")
 
+# Stub the embedding model BEFORE importing the app. Importing app.persistence.vectorstore
+# eagerly constructs FastEmbedEmbeddings, which downloads the ~83 MB ONNX model from the
+# Hugging Face Hub. No test actually embeds (they all mock the vector store), and prod
+# bakes the model into the Docker image — but a fresh CI runner making UNAUTHENTICATED HF
+# requests gets rate-limited, so the download (and thus every test) fails at import. The
+# stub removes that network dependency entirely; the suite stays hermetic and fast.
+import fastembed
+
+
+class _StubTextEmbedding:
+    """No-op stand-in for fastembed.TextEmbedding — constructs without any download."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def _zeros(self, texts):
+        for _ in texts:
+            yield [0.0] * 384  # all-MiniLM-L6-v2 dimensionality
+
+    def embed(self, texts, *args, **kwargs):
+        return self._zeros(texts)
+
+    def passage_embed(self, texts, *args, **kwargs):
+        return self._zeros(texts)
+
+    def query_embed(self, query, *args, **kwargs):
+        return iter([[0.0] * 384])
+
+
+fastembed.TextEmbedding = _StubTextEmbedding
+
 import pytest
 from fastapi.testclient import TestClient
 
