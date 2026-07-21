@@ -18,6 +18,12 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 COPY app/ app/
+# Ship the Alembic migration tooling so schema migrations can be run against the prod DB
+# from the deploy environment (e.g. `alembic upgrade head`). The app itself boots via
+# init_db()'s create_all and imports no alembic at runtime, so these files are inert
+# unless invoked. (.dockerignore drops the README; the versions/ scripts are what matter.)
+COPY alembic/ alembic/
+COPY alembic.ini ./
 # The frontend is served at "/" by app.main, so it must be in the image.
 COPY StudySpace.html ./
 
