@@ -18,7 +18,11 @@ mlartifacts/
 *.db
 studyhelper.db
 *.sqlite
-checkpoints.sqlite
+# Trailing glob also catches SQLite's WAL sidecars (-wal, -shm, -journal),
+# which "*.sqlite" does not match because of the suffix.
+checkpoints.sqlite*
+*.sqlite-wal
+*.sqlite-shm
 
 # OS / editor
 .DS_Store

@@ -11,9 +11,26 @@ restart and can be resumed. Built once and cached.
 
 import sqlite3
 
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+
 from app.config import settings
+from app.agent.state import PlannerState, task, Quiz, QuizQuestion, QuizEval
 
 _checkpointer = None
+
+# Custom Pydantic types that live in AgentState and get persisted into the checkpoint.
+# LangGraph's msgpack serializer already trusts LangChain/LangGraph types (messages,
+# Document, …) via its built-in SAFE list, but our own models are "unregistered":
+# resuming them currently logs a deprecation warning, and once LANGGRAPH_STRICT_MSGPACK
+# becomes the default it will REFUSE to deserialize them — breaking /evaluate and
+# conversational memory, both of which resume graph state from the checkpoint. Passing
+# them here is purely additive to the built-in SAFE set, so nothing else changes.
+_ALLOWED_MSGPACK_MODULES = [PlannerState, task, Quiz, QuizQuestion, QuizEval]
+
+
+def _serde() -> JsonPlusSerializer:
+    """Serializer that explicitly allows our AgentState models (see note above)."""
+    return JsonPlusSerializer(allowed_msgpack_modules=_ALLOWED_MSGPACK_MODULES)
 
 
 def build_checkpointer():
@@ -28,7 +45,7 @@ def build_checkpointer():
         from langgraph.checkpoint.sqlite import SqliteSaver
 
         conn = sqlite3.connect(settings.CHECKPOINT_DB, check_same_thread=False)
-        cp = SqliteSaver(conn)
+        cp = SqliteSaver(conn, serde=_serde())
         cp.setup()
         _checkpointer = cp
     else:
@@ -48,7 +65,7 @@ def build_checkpointer():
             kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
             open=True,
         )
-        cp = PostgresSaver(pool)
+        cp = PostgresSaver(pool, serde=_serde())
         cp.setup()
         _checkpointer = cp
 
