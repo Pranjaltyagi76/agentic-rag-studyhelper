@@ -138,8 +138,14 @@ vector backend — no "works locally, breaks in prod" gap.
 
 ## 4. Database migrations
 - Enable the extension once: `CREATE EXTENSION IF NOT EXISTS vector;` (Neon supports it).
-- Use Alembic (or LangGraph's checkpoint `.setup()`) for tables, run on boot/entrypoint.
-- Idempotent: safe to run every start.
+- **Relational schema (`sessions`, `documents`) is managed by Alembic** — see
+  [`alembic/README.md`](alembic/README.md). `init_db()`'s `create_all` still bootstraps
+  missing tables on boot (idempotent), but column/table *changes* ship as migrations.
+  - **One-time on the existing Neon DB** (created by `create_all`, not yet stamped):
+    `alembic stamp head` — adopts the baseline without recreating anything.
+  - Thereafter apply changes with `alembic upgrade head` (point `DATABASE_URL` at Neon).
+- Checkpoint tables are created by LangGraph's `.setup()`; pgvector tables by PGVector.
+  Alembic is scoped away from both, so it never touches them.
 
 ---
 

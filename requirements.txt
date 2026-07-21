@@ -48,6 +48,7 @@ mlflow
 
 # --- Persistence ---
 SQLAlchemy
+alembic                        # schema migrations (sessions/documents tables)
 psycopg2-binary
 # LangGraph checkpointers: SQLite for local dev, Postgres (Neon) for deploy.
 langgraph-checkpoint-sqlite

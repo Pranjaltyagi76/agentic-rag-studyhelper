@@ -1,8 +1,13 @@
 """Relational database engine + session factory.
 
 SQLAlchemy against ``settings.DATABASE_URL``. Local dev/test defaults to SQLite;
-deploy points it at Neon Postgres (deployment.md). ``init_db`` creates tables on
-startup (Alembic migrations are a Phase 9 concern).
+deploy points it at Neon Postgres (deployment.md).
+
+Schema management: ``init_db`` (create_all) is the zero-setup bootstrap for local dev
+and tests — it only ever CREATES missing tables, never alters existing ones. Evolving
+the schema (adding/altering columns on the live DB) is Alembic's job: the migrations in
+``alembic/`` are the source of truth for changes. See ``alembic/README.md``. A CI test
+(``tests/test_migrations.py``) fails if the models drift from the migrations.
 """
 
 from sqlalchemy import create_engine
