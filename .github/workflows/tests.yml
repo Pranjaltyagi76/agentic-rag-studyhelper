@@ -24,4 +24,12 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run tests
-        run: pytest
+        run: |
+          set +e
+          python -m pytest -rA > pytest-out.txt 2>&1
+          code=$?
+          cat pytest-out.txt
+          if [ "$code" -ne 0 ]; then
+            { echo '### pytest output'; echo '```'; tail -120 pytest-out.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $code
