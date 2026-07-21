@@ -40,6 +40,15 @@ os.environ.setdefault("GROQ_API_KEY", "test-key-not-used")
 os.environ.setdefault("GOOGLE_API_KEY", "test-key-not-used")
 os.environ.setdefault("TAVILY_API_KEY", "test-key-not-used")
 
+# --- Force every optional network call at import OFF, so the suite is deterministic ---
+# The embedding model is stubbed below (no HF download), but importing the app also pulls
+# in huggingface_hub and chromadb, which can make flaky network calls at import (a hub
+# lookup, anonymized telemetry). On CI these intermittently rate-limit / time out and
+# fail collection. Nothing here needs them, so pin them offline.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")  # chromadb telemetry
+
 # Stub the embedding model BEFORE importing the app. Importing app.persistence.vectorstore
 # eagerly constructs FastEmbedEmbeddings, which downloads the ~83 MB ONNX model from the
 # Hugging Face Hub. No test actually embeds (they all mock the vector store), and prod
